@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/math_settings.dart';
 import '../../core/theme/app_theme.dart';
+import '../providers/game_provider.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   DivisionSymbol _selectedSymbol = DivisionSymbol.obelus;
   bool _isDarkMode = true;
 
@@ -36,6 +38,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSymbolOption('Slash (/)', DivisionSymbol.slash),
           _buildSymbolOption('Obelus (÷)', DivisionSymbol.obelus),
           _buildSymbolOption('Colon (:)', DivisionSymbol.colon),
+          const Divider(height: 40),
+          _buildSection('Debug (Solo Desarrollo)'),
+          ListTile(
+            title: const Text('Saltar a Nivel'),
+            subtitle: const Text('Introduce un número para probar niveles avanzados'),
+            trailing: SizedBox(
+              width: 80,
+              child: TextField(
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(hintText: 'Nivel'),
+                onSubmitted: (val) {
+                  final level = int.tryParse(val);
+                  if (level != null && level > 0) {
+                    ref.read(gameProvider.notifier).startNewLevel(level);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Saltando al nivel $level')),
+                    );
+                  }
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );

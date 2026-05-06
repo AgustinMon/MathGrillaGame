@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/puzzle_level.dart';
 import '../../domain/entities/medal.dart';
@@ -14,8 +15,7 @@ class GameState {
   final int timeLeft;
   final bool isGameOver;
   final bool isLevelComplete;
-  final List<int> solvedRows;
-  final List<int> solvedCols;
+  final Set<String> solvedCells; // Format: "x,y"
   final List<Medal> medals;
 
   GameState({
@@ -26,8 +26,7 @@ class GameState {
     this.timeLeft = 60,
     this.isGameOver = false,
     this.isLevelComplete = false,
-    this.solvedRows = const [],
-    this.solvedCols = const [],
+    this.solvedCells = const {},
     this.medals = const [],
   });
 
@@ -39,8 +38,7 @@ class GameState {
     int? timeLeft,
     bool? isGameOver,
     bool? isLevelComplete,
-    List<int>? solvedRows,
-    List<int>? solvedCols,
+    Set<String>? solvedCells,
     List<Medal>? medals,
   }) {
     return GameState(
@@ -51,8 +49,7 @@ class GameState {
       timeLeft: timeLeft ?? this.timeLeft,
       isGameOver: isGameOver ?? this.isGameOver,
       isLevelComplete: isLevelComplete ?? this.isLevelComplete,
-      solvedRows: solvedRows ?? this.solvedRows,
-      solvedCols: solvedCols ?? this.solvedCols,
+      solvedCells: solvedCells ?? this.solvedCells,
       medals: medals ?? this.medals,
     );
   }
@@ -79,10 +76,14 @@ class GameNotifier extends StateNotifier<GameState> {
     state = state.copyWith(
       currentLevel: newLevel,
       levelNumber: level,
-      timeLeft: 60 + (level * 5), // Increase time with level
+      timeLeft: 60 + (level * 5),
       isLevelComplete: false,
+      isGameOver: false,
+      lives: 3,
+      solvedCells: {},
     );
     _startTimer();
+    _checkWinCondition(); // Re-check to highlight fixed solved equations
   }
 
   void _startTimer() {
@@ -98,7 +99,7 @@ class GameNotifier extends StateNotifier<GameState> {
   }
 
   void placeTile(int x, int y, String value) {
-    if (state.currentLevel == null) return;
+    if (state.currentLevel == null || state.isGameOver || state.isLevelComplete) return;
 
     final cellIndex = state.currentLevel!.cells.indexWhere((c) => c.x == x && c.y == y);
     if (cellIndex == -1) return;
@@ -106,7 +107,6 @@ class GameNotifier extends StateNotifier<GameState> {
     final cell = state.currentLevel!.cells[cellIndex];
     if (cell.isFixed) return;
 
-    // Update cell
     final updatedCells = List<GridCell>.from(state.currentLevel!.cells);
     updatedCells[cellIndex] = GridCell(
       x: x,
@@ -119,7 +119,6 @@ class GameNotifier extends StateNotifier<GameState> {
 
     SoundService.playTileDrop();
 
-    // Remove from footer
     final updatedFooter = List<String>.from(state.currentLevel!.footerTiles);
     updatedFooter.remove(value);
 
@@ -139,13 +138,11 @@ class GameNotifier extends StateNotifier<GameState> {
   void _validateMove(int x, int y) {
     if (state.currentLevel == null) return;
 
-    // Check if the row or column where the tile was placed is now "invalid"
-    // An operation is "full" when all non-empty cells have a currentValue
-    final rowCells = state.currentLevel!.cells.where((c) => c.y == y).toList();
-    final colCells = state.currentLevel!.cells.where((c) => c.x == x).toList();
+    final rowCells = state.currentLevel!.cells.where((c) => c.y == y && c.type != CellType.empty).toList();
+    final colCells = state.currentLevel!.cells.where((c) => c.x == x && c.type != CellType.empty).toList();
 
-    _checkOperation(rowCells);
-    _checkOperation(colCells);
+    if (rowCells.length == 5) _checkOperation(rowCells);
+    if (colCells.length == 5) _checkOperation(colCells);
   }
 
   void _checkOperation(List<GridCell> cells) {
@@ -154,14 +151,18 @@ class GameNotifier extends StateNotifier<GameState> {
 
     bool isCorrect = cells.every((c) => c.isCorrect);
     if (!isCorrect) {
-      // Penalty: Loss of life
       if (state.lives > 0) {
-        state = state.copyWith(lives: state.lives - 1);
+        state = state.copyWith(
+          lives: state.lives - 1,
+          score: max(0, state.score - 20),
+        );
         SoundService.playError();
         if (state.lives == 0) {
           state = state.copyWith(isGameOver: true);
         }
       }
+    } else {
+      state = state.copyWith(score: state.score + 10);
     }
   }
 
@@ -169,78 +170,60 @@ class GameNotifier extends StateNotifier<GameState> {
     if (state.currentLevel == null) return;
 
     final size = state.currentLevel!.size;
-    final List<int> newlySolvedRows = [];
-    final List<int> newlySolvedCols = [];
+    final Set<String> newlySolvedCells = {};
 
-    // Check rows
+    // Check all possible horizontal 5-cell sequences
     for (int y = 0; y < size; y++) {
-      final rowCells = state.currentLevel!.cells.where((c) => c.y == y).toList();
-      if (rowCells.isNotEmpty && rowCells.every((c) => c.isCorrect)) {
-        newlySolvedRows.add(y);
+      for (int x = 0; x <= size - 5; x++) {
+        final sequence = <GridCell>[];
+        for (int i = 0; i < 5; i++) {
+          sequence.add(_getCellAt(x + i, y));
+        }
+        if (sequence.every((c) => c.type != CellType.empty) && sequence.every((c) => c.isCorrect)) {
+          for (var c in sequence) newlySolvedCells.add("${c.x},${c.y}");
+        }
       }
     }
 
-    // Check cols
+    // Check all possible vertical 5-cell sequences
     for (int x = 0; x < size; x++) {
-      final colCells = state.currentLevel!.cells.where((c) => c.x == x).toList();
-      if (colCells.isNotEmpty && colCells.every((c) => c.isCorrect)) {
-        newlySolvedCols.add(x);
+      for (int y = 0; y <= size - 5; y++) {
+        final sequence = <GridCell>[];
+        for (int i = 0; i < 5; i++) {
+          sequence.add(_getCellAt(x, y + i));
+        }
+        if (sequence.every((c) => c.type != CellType.empty) && sequence.every((c) => c.isCorrect)) {
+          for (var c in sequence) newlySolvedCells.add("${c.x},${c.y}");
+        }
       }
     }
 
-    // Bonus: If multiple rows/cols solved at once
-    int comboCount = 0;
-    if (newlySolvedRows.length > state.solvedRows.length) {
-      comboCount += (newlySolvedRows.length - state.solvedRows.length);
-    }
-    if (newlySolvedCols.length > state.solvedCols.length) {
-      comboCount += (newlySolvedCols.length - state.solvedCols.length);
-    }
-
-    if (comboCount > 1) {
-      state = state.copyWith(score: state.score + (comboCount * 50));
-    }
-
-    if (newlySolvedRows.length > state.solvedRows.length || newlySolvedCols.length > state.solvedCols.length) {
-      SoundService.playSuccess();
-    }
+    state = state.copyWith(solvedCells: newlySolvedCells);
 
     final allCorrect = state.currentLevel!.cells.every((c) => c.isCorrect || c.type == CellType.empty);
-    
-    state = state.copyWith(
-      solvedRows: newlySolvedRows,
-      solvedCols: newlySolvedCols,
-    );
-
-    if (allCorrect && state.currentLevel!.footerTiles.isEmpty) {
+    if (allCorrect && state.currentLevel!.footerTiles.isEmpty && !state.isLevelComplete) {
       _timer?.cancel();
       SoundService.playWin();
       _checkMedals();
       state = state.copyWith(
         isLevelComplete: true,
-        score: state.score + 100 + state.timeLeft,
+        score: state.score + (state.levelNumber * 50) + (state.timeLeft * 2),
       );
     }
   }
 
+  GridCell _getCellAt(int x, int y) {
+    return state.currentLevel!.cells.firstWhere(
+      (c) => c.x == x && c.y == y,
+      orElse: () => GridCell(x: x, y: y, type: CellType.empty),
+    );
+  }
+
   void _checkMedals() async {
     final repo = MedalRepository();
-    
-    // Level 1 medal
-    if (state.levelNumber == 1) {
-      await repo.unlockMedal('first_step');
-    }
-
-    // Level 10 medal
-    if (state.levelNumber == 10) {
-      await repo.unlockMedal('math_genius');
-    }
-
-    // Speed Runner
-    if (state.timeLeft > 40) { // Assuming 60s start
-       await repo.unlockMedal('speed_runner');
-    }
-
+    if (state.levelNumber == 1) await repo.unlockMedal('first_step');
+    if (state.levelNumber == 10) await repo.unlockMedal('math_genius');
+    if (state.timeLeft > 40) await repo.unlockMedal('speed_runner');
     _loadMedals();
   }
 
