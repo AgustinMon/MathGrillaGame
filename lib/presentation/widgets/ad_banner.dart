@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'dart:io';
+import 'dart:io' show Platform;
 
 class AdBanner extends StatefulWidget {
   const AdBanner({super.key});
@@ -13,14 +14,19 @@ class _AdBannerState extends State<AdBanner> {
   BannerAd? _bannerAd;
   bool _isLoaded = false;
 
-  final String adUnitId = Platform.isAndroid
+  String get adUnitId {
+    if (kIsWeb) return ''; // Not used for now on web
+    return Platform.isAndroid
       ? 'ca-app-pub-3940256099942544/6300978111' // Test ID
       : 'ca-app-pub-3940256099942544/2934735716'; // Test ID iOS
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadAd();
+    if (!kIsWeb) {
+      _loadAd();
+    }
   }
 
   void _loadAd() {

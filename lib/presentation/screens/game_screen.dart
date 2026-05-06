@@ -17,20 +17,35 @@ class GameScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameProvider);
 
+    // Escuchar cambios para mostrar diálogos de éxito o derrota
+    ref.listen(gameProvider, (previous, next) {
+      if (next.isLevelComplete && !(previous?.isLevelComplete ?? false)) {
+        _showWinDialog(context, ref, next);
+      }
+      if (next.isGameOver && !(previous?.isGameOver ?? false)) {
+        _showGameOverDialog(context, ref, next);
+      }
+    });
+
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context, gameState),
-            Expanded(
-              child: Center(
-                child: _buildGrid(context, gameState, ref),
-              ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(context, gameState),
+                Expanded(
+                  child: Center(
+                    child: _buildGrid(context, gameState, ref),
+                  ),
+                ),
+                _buildFooter(gameState),
+                const AdBanner(),
+              ],
             ),
-            _buildFooter(gameState),
-            const AdBanner(),
-          ],
-        ),
+          ),
+          if (gameState.isLevelComplete) _buildVictoryOverlay(),
+        ],
       ),
     );
   }
@@ -177,6 +192,86 @@ class GameScreen extends ConsumerWidget {
         },
       ),
     ).animate().slideY(begin: 1, duration: 500.ms, curve: Curves.easeOutCubic);
+  }
+
+  Widget _buildVictoryOverlay() {
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '¡EXCELENTE!',
+              style: TextStyle(
+                fontSize: 50,
+                fontWeight: FontWeight.bold,
+                color: Colors.amber,
+                letterSpacing: 4,
+                shadows: [Shadow(color: Colors.orange, blurRadius: 20)],
+              ),
+            ).animate().scale(duration: 600.ms, curve: Curves.elasticOut).then().shimmer(duration: 1.seconds),
+            const SizedBox(height: 20),
+            const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 80)
+                .animate(onPlay: (controller) => controller.repeat())
+                .scale(duration: 1.seconds, begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2))
+                .rotate(duration: 2.seconds),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
+
+  void _showWinDialog(BuildContext context, WidgetRef ref, GameState state) {
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppTheme.darkCard,
+          title: const Text('¡Nivel Completado!', style: TextStyle(color: AppTheme.primaryBlue)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.star, color: Colors.amber, size: 60),
+              const SizedBox(height: 20),
+              Text('Puntuación: ${state.score}', style: const TextStyle(fontSize: 20)),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                ref.read(gameProvider.notifier).startNewLevel(state.levelNumber + 1);
+              },
+              child: const Text('Siguiente Nivel'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  void _showGameOverDialog(BuildContext context, WidgetRef ref, GameState state) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.darkCard,
+        title: const Text('¡Game Over!', style: TextStyle(color: AppTheme.neonRed)),
+        content: const Text('Te has quedado sin vidas o tiempo.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(gameProvider.notifier).startNewLevel(1);
+            },
+            child: const Text('Reintentar desde Nivel 1'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
