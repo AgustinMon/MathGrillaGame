@@ -30,7 +30,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SwitchListTile(
             title: const Text('Modo Oscuro'),
             value: _isDarkMode,
-            activeColor: AppTheme.primaryBlue,
+            activeThumbColor: AppTheme.primaryBlue,
             onChanged: (val) => setState(() => _isDarkMode = val),
           ),
           const Divider(),
@@ -39,10 +39,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSymbolOption('Obelus (÷)', DivisionSymbol.obelus),
           _buildSymbolOption('Colon (:)', DivisionSymbol.colon),
           const Divider(height: 40),
+          _buildSection('Ayuda y Tutoriales'),
+          ListTile(
+            leading: const Icon(Icons.help_outline, color: AppTheme.primaryBlue),
+            title: const Text('Restablecer Tutoriales'),
+            subtitle: const Text('Volver a mostrar los carteles de ayuda al iniciar el Nivel 1'),
+            onTap: () {
+              ref.read(gameProvider.notifier).resetTutorials();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tutoriales restablecidos'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          const Divider(height: 40),
           _buildSection('Debug (Solo Desarrollo)'),
           ListTile(
             title: const Text('Saltar a Nivel'),
-            subtitle: const Text('Introduce un número para probar niveles avanzados'),
+            subtitle: const Text(
+              'Introduce un número para probar niveles avanzados',
+            ),
             trailing: SizedBox(
               width: 80,
               child: TextField(

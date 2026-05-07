@@ -22,21 +22,24 @@ Todos los iconos, ayudas y movimientos serán animados
 Desarrollo minimalista pero elegante y moderno.
 Los niveles agrandan la cuadricula
 
-Algoritmo de niveles
+# Algoritmo de niveles
 Los niveles deben desarrollarse en forma procedural y ser infinitos.
 Las cifras a resolver no deben ser de mas de 3 cifras.
 Se acepta suma, resta, division, multiplicacion.
 En niveles más avanzados puede aceptarse potencia, raiz (haz la prueba con uno para evaluar si es jugable)
 
-#Configuracion
+# Configuracion
 Implementa un menu de configuración
 En el menú hay tema claro y oscuro.
 El usuario debe poder decidir qué símbolo quiere para la división entre los 3 posibles más comunes.
 
-Varios
+# Varios
 Implementa un admob con id de test en el footer
 Implementa un sistema de leaderboard con los mejores puntajes.
 Implementa un sistema de niveles que se irão desbloqueando.
 Implementa un sistema de bonificaciones que se obtendrán al resolver las operaciones correctamente.
 Implementa un sistema de penalizaciones que se obtendrán al resolver las operaciones incorrectamente.
 Implementa un sistema de medallas o rewards
+
+# Development
+Comenta las líneas de codigo complejas y las funciones para que sean entendidas por un humano

@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/screens/tutorial_screen.dart';
+import 'domain/use_cases/math_engine.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Cargamos los niveles pre-diseñados desde el JSON.
+  await MathEngine.loadLevels();
   
   if (!kIsWeb) {
     try {

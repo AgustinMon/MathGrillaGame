@@ -6,7 +6,8 @@ class GridCell {
   final CellType type;
   final String? value; // The "hidden" or "target" value
   String? currentValue; // What the user has placed
-  bool isFixed; // If the cell is pre-filled
+  final bool isFixed; // If the cell is pre-filled
+  final bool isHorizontal; // Orientation for crossword logic
 
   GridCell({
     required this.x,
@@ -15,9 +16,22 @@ class GridCell {
     this.value,
     this.currentValue,
     this.isFixed = false,
+    this.isHorizontal = true,
   });
 
-  bool get isCorrect => currentValue == value;
+  bool get isCorrect => currentValue?.trim() == value?.trim();
+
+  factory GridCell.fromJson(Map<String, dynamic> json) {
+    return GridCell(
+      x: json['x'],
+      y: json['y'],
+      type: CellType.values[json['type']],
+      value: json['value'],
+      currentValue: json['isFixed'] ? json['value'] : null,
+      isFixed: json['isFixed'] ?? false,
+      isHorizontal: json['isHorizontal'] ?? true,
+    );
+  }
 }
 
 class PuzzleLevel {
@@ -32,4 +46,13 @@ class PuzzleLevel {
     required this.cells,
     required this.footerTiles,
   });
+
+  factory PuzzleLevel.fromJson(Map<String, dynamic> json) {
+    return PuzzleLevel(
+      id: json['id'],
+      size: json['size'],
+      cells: (json['cells'] as List).map((c) => GridCell.fromJson(c)).toList(),
+      footerTiles: List<String>.from(json['footerTiles']),
+    );
+  }
 }
