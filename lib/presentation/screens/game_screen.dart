@@ -26,6 +26,7 @@ class GameScreen extends ConsumerStatefulWidget {
 
 class _GameScreenState extends ConsumerState<GameScreen> {
   final ScrollController _footerScrollController = ScrollController();
+  final TransformationController _transformationController = TransformationController();
   RewardedAd? _rewardedAd;
   bool _isAdLoaded = false;
 
@@ -35,6 +36,41 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (!kIsWeb) {
       _loadRewardedAd();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _centerGrid();
+    });
+  }
+
+  void _centerGrid() {
+    if (!mounted) return;
+    final size = MediaQuery.of(context).size;
+    const canvasWidth = 1500.0;
+    const canvasHeight = 1500.0;
+    final x = (canvasWidth - size.width) / 2;
+    final y = (canvasHeight - (size.height * 0.7)) / 2;
+    _transformationController.value = Matrix4.identity();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final size = MediaQuery.of(context).size;
+      
+      // Obtenemos el tamaño real del canvas desde el estado actual
+      final gameState = ref.read(gameProvider);
+      if (gameState.currentLevel == null) return;
+      
+      final gridSize = gameState.currentLevel!.size;
+      final double cellSize = gridSize > 14 ? (gridSize > 20 ? 28 : 38) : (gridSize > 10 ? 45 : 65);
+      final spacing = gridSize > 14 ? 1.0 : 2.0;
+      final totalGridSize = (cellSize * gridSize) + (spacing * (gridSize - 1)) + 40; // + padding
+      
+      final canvasWidth = max(totalGridSize * 2, size.width);
+      final canvasHeight = max(totalGridSize * 2, size.height);
+
+      final x = (canvasWidth - size.width) / 2;
+      final y = (canvasHeight - (size.height * 0.6)) / 2;
+
+      _transformationController.value = Matrix4.identity()..translate(-x, -y);
+    });
   }
 
   void _loadRewardedAd() {
@@ -109,6 +145,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         _showGameOverDialog(context, ref, next, l10n);
       }
       
+      if (next.levelNumber != previous?.levelNumber) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _centerGrid();
+        });
+      }
+
       if (next.levelNumber == 1 && next.showTutorial && previous?.levelNumber != 1) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showTutorialDialog(context, l10n);
@@ -126,6 +168,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 Expanded(
                   child: Center(child: _buildGrid(context, gameState, ref, l10n)), // El tablero de juego.
                 ),
+                _buildActionButtons(gameState, ref, l10n), // Botones de Deshacer y Pista
                 if (gameState.difficulty == 'hard') _buildMachine(gameState, l10n), // Nueva máquina de fusión
                 _buildFooter(gameState, l10n), // Inventario de piezas arrastrables.
                 const AdBanner(), // Banner publicitario.
@@ -242,7 +285,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   Widget _buildHeader(BuildContext context, GameState state, WidgetRef ref, Translations l10n) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black26,
         border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
@@ -312,54 +355,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             value: '${state.score}',
           ).animate(target: state.score.toDouble()).scale(begin: const Offset(1,1), end: const Offset(1.2, 1.2), duration: 200.ms).then().scale(begin: const Offset(1.2, 1.2), end: const Offset(1, 1)),
 
-          // Botón de Pistas / Anuncio Recompensado
-          GestureDetector(
-            onTap: () {
-              if (state.hintsRemaining > 0) {
-                ref.read(gameProvider.notifier).useHint();
-              } else {
-                _showAd();
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: state.hintsRemaining > 0 ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: state.hintsRemaining > 0 ? Colors.amber.withOpacity(0.5) : Colors.blue.withOpacity(0.5),
-                ),
-                boxShadow: [
-                  if (state.hintsRemaining > 0)
-                    BoxShadow(color: Colors.amber.withOpacity(0.1), blurRadius: 4, spreadRadius: 1),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    state.hintsRemaining > 0 ? Icons.lightbulb : Icons.play_circle_fill,
-                    size: 18,
-                    color: state.hintsRemaining > 0 ? Colors.amber : Colors.blueAccent,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    state.hintsRemaining > 0 ? '${state.hintsRemaining}' : l10n.text('hints_label'),
-                    style: TextStyle(
-                      color: state.hintsRemaining > 0 ? Colors.amber : Colors.blueAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ).animate(target: state.hintsRemaining == 0 ? 1 : 0).shake(hz: 4, curve: Curves.easeInOut),
-          
-          IconButton(
-            icon: const Icon(Icons.undo, color: Colors.amberAccent, size: 20),
-            onPressed: () => ref.read(gameProvider.notifier).undoMove(),
-          ),
-          
           // Selector de Tema
           IconButton(
             icon: Icon(
@@ -369,9 +364,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             ),
             onPressed: () => ref.read(settingsProvider.notifier).toggleTheme(),
           ),
-          
-          // Iconos de acciones secundarias - Movidos a la portada
-          const SizedBox(width: 40), // Espacio para mantener el balance visual si es necesario
         ],
       ),
     ).animate().fadeIn(duration: 600.ms).slideY(begin: -0.1);
@@ -382,19 +374,21 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (state.currentLevel == null) return const CircularProgressIndicator();
 
     final size = state.currentLevel!.size;
-    // Tamaño de celda más adaptativo para evitar desbordamientos masivos
-    final double cellSize = size > 14 ? (size > 20 ? 22 : 32) : (size > 10 ? 40 : 55);
+    // Tamaño de celda más generoso para que se vea bien
+    final double cellSize = size > 14 ? (size > 20 ? 28 : 38) : (size > 10 ? 45 : 65);
     final spacing = size > 14 ? 1.0 : 2.0;
     final totalGridSize = (cellSize * size) + (spacing * (size - 1));
     final screenSize = MediaQuery.of(context).size;
-    // Aseguramos un lienzo lo suficientemente grande para centrar
-    final double canvasWidth = max(totalGridSize + 100, screenSize.width);
-    final double canvasHeight = max(totalGridSize + 100, screenSize.height);
+    
+    // Canvas proporcional al tamaño de la grilla
+    final double canvasWidth = max(totalGridSize * 2, screenSize.width);
+    final double canvasHeight = max(totalGridSize * 2, screenSize.height);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InteractiveViewer(
-        boundaryMargin: const EdgeInsets.all(400), // Aumentado para mayor libertad
+        transformationController: _transformationController,
+        boundaryMargin: const EdgeInsets.all(600),
         minScale: 0.1,
         maxScale: 2.5,
         constrained: false, 
@@ -951,14 +945,14 @@ class _StatItem extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 12, 
+            fontSize: 10, 
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
           ),
         ),
         Text(
           value,
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
             color: isWarning 
                 ? Colors.redAccent 
@@ -966,6 +960,71 @@ class _StatItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+extension GameScreenActions on _GameScreenState {
+  Widget _buildActionButtons(GameState state, WidgetRef ref, Translations l10n) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Botón Deshacer (Solo Icono)
+          GestureDetector(
+            onTap: () => ref.read(gameProvider.notifier).undoMove(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber, width: 1.5),
+              ),
+              child: const Icon(Icons.undo, color: Colors.amber, size: 22),
+            ),
+          ),
+          const SizedBox(width: 20),
+          // Botón Pista (Lamparita)
+          GestureDetector(
+            onTap: () {
+              if (state.hintsRemaining > 0) {
+                ref.read(gameProvider.notifier).useHint();
+              } else {
+                _showAd();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: state.hintsRemaining > 0 ? Colors.blue.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent, 
+                  width: 1.5
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    state.hintsRemaining > 0 ? Icons.lightbulb : Icons.play_circle_fill,
+                    size: 20,
+                    color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    state.hintsRemaining > 0 ? '${state.hintsRemaining}' : l10n.text('hints_label'),
+                    style: TextStyle(
+                      color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent,
+                      fontWeight: FontWeight.bold
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ).animate(target: state.hintsRemaining == 0 ? 1 : 0).shake(hz: 4, curve: Curves.easeInOut),
+        ],
+      ),
     );
   }
 }
