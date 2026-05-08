@@ -36,15 +36,17 @@ class GridCell {
 
 class PuzzleLevel {
   final int id;
-  final int size; // Grid size (e.g., 5x5)
+  final int size;
   final List<GridCell> cells;
-  final List<String> footerTiles; // Numbers/operators available to drag
+  final List<String> footerTiles;
+  final List<String> machineTiles;
 
   PuzzleLevel({
     required this.id,
     required this.size,
     required this.cells,
     required this.footerTiles,
+    this.machineTiles = const [],
   });
 
   factory PuzzleLevel.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class PuzzleLevel {
       size: json['size'],
       cells: (json['cells'] as List).map((c) => GridCell.fromJson(c)).toList(),
       footerTiles: List<String>.from(json['footerTiles']),
+      machineTiles: List<String>.from(json['machineTiles'] ?? []),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/screens/tutorial_screen.dart';
 import 'domain/use_cases/math_engine.dart';
+import 'presentation/providers/settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,17 +28,20 @@ void main() async {
   );
 }
 
-class CrucimathApp extends StatelessWidget {
+class CrucimathApp extends ConsumerWidget {
   const CrucimathApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+
     return MaterialApp(
       title: 'Crucimath',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark, // Default to dark as requested
+      themeMode: settings.themeMode,
+      locale: settings.locale,
       home: const TutorialScreen(),
     );
   }

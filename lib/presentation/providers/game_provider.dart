@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/puzzle_level.dart';
@@ -26,6 +27,23 @@ class GameState {
   final int hintsRemaining; // Pistas disponibles.
   final bool isTimerPaused; // Indica si el tiempo está pausado (ej: viendo un anuncio).
   final bool showTutorial; // Indica si se debe mostrar el tutorial al iniciar el Nivel 1.
+  final String? machineInputA;
+  final String? machineInputB;
+  final String machineOp;
+  final List<String> machineTiles;
+  final bool machineInputAFromMachine;
+  final bool machineInputBFromMachine;
+  final String? machineResult;
+  final String? machineLastInputA;
+  final String? machineLastInputB;
+  final bool machineLastInputAFromMachine;
+  final bool machineLastInputBFromMachine;
+  final String? machineLastOp;
+  final int comboCount;
+  final DateTime? lastSolveTime;
+  final int errorTrigger; // Incrementado para disparar sacudida de pantalla
+  final Map<String, Map<String, dynamic>> fusedTilesData;
+  final List<Map<String, dynamic>> moveHistory; // Historial para deshacer
 
   GameState({
     this.currentLevel,
@@ -44,6 +62,23 @@ class GameState {
     this.hintsRemaining = 2,
     this.isTimerPaused = false,
     this.showTutorial = true,
+    this.machineInputA,
+    this.machineInputB,
+    this.machineOp = '+',
+    this.machineTiles = const [],
+    this.machineInputAFromMachine = false,
+    this.machineInputBFromMachine = false,
+    this.machineResult,
+    this.machineLastInputA,
+    this.machineLastInputB,
+    this.machineLastInputAFromMachine = false,
+    this.machineLastInputBFromMachine = false,
+    this.machineLastOp,
+    this.fusedTilesData = const {},
+    this.comboCount = 0,
+    this.lastSolveTime,
+    this.errorTrigger = 0,
+    this.moveHistory = const [],
   });
 
   /// Crea una copia del estado actual permitiendo modificar solo algunos campos.
@@ -64,6 +99,26 @@ class GameState {
     int? hintsRemaining,
     bool? isTimerPaused,
     bool? showTutorial,
+    String? machineInputA,
+    String? machineInputB,
+    bool clearMachineA = false,
+    bool clearMachineB = false,
+    String? machineOp,
+    List<String>? machineTiles,
+    bool? machineInputAFromMachine,
+    bool? machineInputBFromMachine,
+    String? machineResult,
+    bool clearMachineResult = false,
+    String? machineLastInputA,
+    String? machineLastInputB,
+    bool? machineLastInputAFromMachine,
+    bool? machineLastInputBFromMachine,
+    String? machineLastOp,
+    int? comboCount,
+    DateTime? lastSolveTime,
+    int? errorTrigger,
+    Map<String, Map<String, dynamic>>? fusedTilesData,
+    List<Map<String, dynamic>>? moveHistory,
   }) {
     return GameState(
       currentLevel: currentLevel ?? this.currentLevel,
@@ -82,6 +137,23 @@ class GameState {
       hintsRemaining: hintsRemaining ?? this.hintsRemaining,
       isTimerPaused: isTimerPaused ?? this.isTimerPaused,
       showTutorial: showTutorial ?? this.showTutorial,
+      machineInputA: clearMachineA ? null : (machineInputA ?? this.machineInputA),
+      machineInputB: clearMachineB ? null : (machineInputB ?? this.machineInputB),
+      machineOp: machineOp ?? this.machineOp,
+      machineTiles: machineTiles ?? this.machineTiles,
+      machineInputAFromMachine: machineInputAFromMachine ?? this.machineInputAFromMachine,
+      machineInputBFromMachine: machineInputBFromMachine ?? this.machineInputBFromMachine,
+      machineResult: clearMachineResult ? null : (machineResult ?? this.machineResult),
+      machineLastInputA: machineLastInputA ?? this.machineLastInputA,
+      machineLastInputB: machineLastInputB ?? this.machineLastInputB,
+      machineLastInputAFromMachine: machineLastInputAFromMachine ?? this.machineLastInputAFromMachine,
+      machineLastInputBFromMachine: machineInputBFromMachine ?? this.machineLastInputBFromMachine,
+      machineLastOp: machineLastOp ?? this.machineLastOp,
+      fusedTilesData: fusedTilesData ?? this.fusedTilesData,
+      comboCount: comboCount ?? this.comboCount,
+      lastSolveTime: lastSolveTime ?? this.lastSolveTime,
+      errorTrigger: errorTrigger ?? this.errorTrigger,
+      moveHistory: moveHistory ?? this.moveHistory,
     );
   }
 }
@@ -136,6 +208,12 @@ class GameNotifier extends StateNotifier<GameState> {
       message: null,
       hintsRemaining: state.difficulty == 'hard' ? 3 : 2,
       isTimerPaused: false,
+      machineInputA: null,
+      machineInputB: null,
+      machineOp: '+',
+      machineTiles: newLevel.machineTiles,
+      machineInputAFromMachine: false,
+      machineInputBFromMachine: false,
     );
     _startTimer();
     _checkWinCondition();
@@ -163,7 +241,7 @@ class GameNotifier extends StateNotifier<GameState> {
   }
 
   /// Coloca una pieza de número en una posición específica del tablero.
-  void placeTile(int x, int y, String value) {
+  void placeTile(int x, int y, String value, {Map<String, dynamic>? fusionData}) {
     if (state.currentLevel == null || state.isGameOver || state.isLevelComplete)
       return;
 
@@ -198,14 +276,27 @@ class GameNotifier extends StateNotifier<GameState> {
     // Quitamos la nueva pieza del footer.
     updatedFooter.remove(value);
 
+    // Registramos en el historial
+    final newHistory = List<Map<String, dynamic>>.from(state.moveHistory);
+    newHistory.add({'x': x, 'y': y});
+    
     state = state.copyWith(
+      moveHistory: newHistory,
       currentLevel: PuzzleLevel(
         id: state.currentLevel!.id,
         size: state.currentLevel!.size,
         cells: updatedCells,
         footerTiles: updatedFooter,
+        machineTiles: state.machineTiles,
       ),
     );
+
+    // Guardamos metadata si es una pieza fusionada
+    if (fusionData != null) {
+      final newFusedData = Map<String, Map<String, dynamic>>.from(state.fusedTilesData);
+      newFusedData["$x,$y"] = fusionData;
+      state = state.copyWith(fusedTilesData: newFusedData);
+    }
 
     // Validamos si el movimiento completó una operación y chequeamos si ganó el nivel.
     _validateMove(x, y);
@@ -226,9 +317,35 @@ class GameNotifier extends StateNotifier<GameState> {
     if (cell.isFixed || cell.currentValue == null) return;
 
     final updatedFooter = List<String>.from(state.currentLevel!.footerTiles);
-    updatedFooter.add(cell.currentValue!);
-
     final updatedCells = List<GridCell>.from(state.currentLevel!.cells);
+    final tileValue = cell.currentValue!;
+    final posKey = "$x,$y";
+
+    // Si era una pieza fusionada, se descompone
+    if (state.fusedTilesData.containsKey(posKey)) {
+      final data = state.fusedTilesData[posKey]!;
+      final valA = data['valA'] as String?;
+      final valB = data['valB'] as String?;
+      final fromMachineA = data['fromA'] as bool? ?? false;
+      final fromMachineB = data['fromB'] as bool? ?? false;
+
+      // Quitamos la metadata
+      final newFusedData = Map<String, Map<String, dynamic>>.from(state.fusedTilesData);
+      newFusedData.remove(posKey);
+
+      // Devolvemos los ingredientes originales a la máquina
+      if (valA != null) addToMachine(1, valA, isMachineTile: fromMachineA);
+      if (valB != null) addToMachine(2, valB, isMachineTile: fromMachineB);
+
+      state = state.copyWith(
+        fusedTilesData: newFusedData,
+        message: 'Pieza descompuesta en sus ingredientes.',
+      );
+      // NO la añadimos al updatedFooter
+    } else {
+      updatedFooter.add(tileValue);
+    }
+
     updatedCells[cellIndex] = GridCell(
       x: x,
       y: y,
@@ -244,10 +361,27 @@ class GameNotifier extends StateNotifier<GameState> {
         size: state.currentLevel!.size,
         cells: updatedCells,
         footerTiles: updatedFooter,
+        machineTiles: state.machineTiles,
       ),
     );
+    // Quitamos del historial si existía manualmente
+    final newHistory = state.moveHistory.where((m) => m['x'] != x || m['y'] != y).toList();
+    state = state.copyWith(moveHistory: newHistory);
 
     _checkWinCondition();
+  }
+
+  /// Alterna el estado de pausa del juego.
+  void togglePause() {
+    state = state.copyWith(isTimerPaused: !state.isTimerPaused);
+  }
+
+  /// Deshace el último movimiento realizado en la grilla.
+  void undoMove() {
+    if (state.moveHistory.isEmpty || state.isTimerPaused) return;
+    
+    final lastMove = state.moveHistory.last;
+    removeTile(lastMove['x'], lastMove['y']);
   }
 
   /// Valida si la fila o columna donde se puso la pieza está completa y es correcta.
@@ -294,34 +428,44 @@ class GameNotifier extends StateNotifier<GameState> {
 
       if (valA == null || op == null || valB == null || valRes == null) return;
 
-      if (_isMathCorrect(cells)) {
-        // Si el cálculo es matemáticamente válido, marcamos todas las celdas como resueltas
-        // Esto permite la propiedad conmutativa (ej: 14+4 y 4+14)
-        for (var cell in cells) {
-          final gridCell = state.currentLevel!.cells.firstWhere((c) => c.x == cell.x && c.y == cell.y);
-          if (!gridCell.isFixed) {
-            // Actualizamos el currentValue en el objeto original para que isCorrect sea true
-            // Aunque ahora isCorrect será secundario a la validación matemática.
-          }
-        }
+      final bool isMathCorrect = _isMathCorrect(cells);
+      final newSolvedCells = Set<String>.from(state.solvedCells);
+      for (var c in cells) {
+        newSolvedCells.add('${c.x},${c.y}');
+      }
 
-        // Marcamos la fila/columna como resuelta visualmente
-        final newSolvedCells = Set<String>.from(state.solvedCells);
-        for (var c in cells) {
-          newSolvedCells.add('${c.x},${c.y}');
+      if (isMathCorrect) {
+        final now = DateTime.now();
+        int points = 100;
+        int newCombo = 1;
+        
+        if (state.lastSolveTime != null) {
+          final diff = now.difference(state.lastSolveTime!).inSeconds;
+          if (diff < 10) { // Si resuelve en menos de 10s, combo!
+            newCombo = state.comboCount + 1;
+            points *= newCombo;
+          }
         }
 
         if (isHorizontal) {
           state = state.copyWith(
             solvedRows: {...state.solvedRows, cells[0].y},
             solvedCells: newSolvedCells,
-            score: state.score + 10,
+            score: state.score + points,
+            comboCount: newCombo,
+            lastSolveTime: now,
+            message: newCombo > 1 ? 'COMBO x$newCombo! +$points' : '¡Excelente!',
+            timeLeft: state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
           );
         } else {
           state = state.copyWith(
             solvedCols: {...state.solvedCols, cells[0].x},
             solvedCells: newSolvedCells,
-            score: state.score + 10,
+            score: state.score + points,
+            comboCount: newCombo,
+            lastSolveTime: now,
+            message: newCombo > 1 ? 'COMBO x$newCombo! +$points' : '¡Excelente!',
+            timeLeft: state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
           );
         }
         SoundService.playSuccess();
@@ -330,8 +474,10 @@ class GameNotifier extends StateNotifier<GameState> {
         if (state.lives > 0) {
           state = state.copyWith(
             lives: state.lives - 1,
-            score: max(0, state.score - 20),
-            message: '¡Algo no cuadra! Revisa los números azules.',
+            score: max(0, state.score - 50),
+            errorTrigger: state.errorTrigger + 1,
+            comboCount: 0, // Reset combo on error
+            message: 'Algo no está bien...',
           );
           SoundService.playError();
           if (state.lives == 0) {
@@ -340,7 +486,7 @@ class GameNotifier extends StateNotifier<GameState> {
         }
       }
     } catch (e) {
-      print('Error validando operación: $e');
+      debugPrint('Error validando operación: $e');
     }
 
     // Limpiamos el mensaje después de unos segundos.
@@ -474,9 +620,28 @@ class GameNotifier extends StateNotifier<GameState> {
     ).toList();
 
     if (unsolvedCells.isEmpty) return;
-
+    
     final target = unsolvedCells[Random().nextInt(unsolvedCells.length)];
+
     if (target.value != null) {
+      // Al usar una pista, si el número estaba en el footer o máquina, deberíamos quitarlo.
+      // Por simplicidad lo quitamos del footer si existe.
+      final updatedFooter = List<String>.from(state.currentLevel!.footerTiles);
+      updatedFooter.remove(target.value);
+      
+      final updatedMachine = List<String>.from(state.machineTiles);
+      updatedMachine.remove(target.value);
+
+      state = state.copyWith(
+        currentLevel: PuzzleLevel(
+          id: state.currentLevel!.id,
+          size: state.currentLevel!.size,
+          cells: state.currentLevel!.cells,
+          footerTiles: updatedFooter,
+          machineTiles: updatedMachine,
+        ),
+        machineTiles: updatedMachine,
+      );
       placeTile(target.x, target.y, target.value!);
     }
     state = state.copyWith(hintsRemaining: state.hintsRemaining - 1);
@@ -502,6 +667,148 @@ class GameNotifier extends StateNotifier<GameState> {
   /// Restablece todos los tutoriales para que se vuelvan a mostrar.
   Future<void> resetTutorials() async {
     await setTutorialVisible(true);
+  }
+
+  void addToMachine(int slot, String value, {bool isMachineTile = false}) {
+    if (state.difficulty != 'hard') return;
+    
+    // Solo permitimos ingredientes (rosas) en la máquina como pidió el usuario.
+    if (!isMachineTile) {
+      state = state.copyWith(message: 'only_pink');
+      return;
+    }
+
+    List<String> updatedFooter = List<String>.from(state.currentLevel?.footerTiles ?? []);
+    List<String> updatedMachine = List<String>.from(state.machineTiles);
+
+    // 1. Devolver el valor anterior del slot si existe
+    final oldValue = slot == 1 ? state.machineInputA : state.machineInputB;
+    final wasFromMachine = slot == 1 ? state.machineInputAFromMachine : state.machineInputBFromMachine;
+
+    if (oldValue != null) {
+      if (wasFromMachine) {
+        updatedMachine.add(oldValue);
+      } else {
+        updatedFooter.add(oldValue);
+      }
+    }
+
+    // 2. Quitar el nuevo valor de su lista de origen
+    if (isMachineTile) {
+      updatedMachine.remove(value);
+    } else {
+      updatedFooter.remove(value);
+    }
+
+    // 3. Actualizar estado de forma atómica
+    state = state.copyWith(
+      currentLevel: PuzzleLevel(
+        id: state.currentLevel!.id,
+        size: state.currentLevel!.size,
+        cells: state.currentLevel!.cells,
+        footerTiles: updatedFooter,
+        machineTiles: updatedMachine,
+      ),
+      machineTiles: updatedMachine,
+      machineInputA: slot == 1 ? value : state.machineInputA,
+      machineInputB: slot == 2 ? value : state.machineInputB,
+      machineInputAFromMachine: slot == 1 ? isMachineTile : state.machineInputAFromMachine,
+      machineInputBFromMachine: slot == 2 ? isMachineTile : state.machineInputBFromMachine,
+    );
+
+    SoundService.playTileDrop();
+  }
+
+  void removeFromMachine(int slot) {
+    final value = slot == 1 ? state.machineInputA : state.machineInputB;
+    final isMachineTile = slot == 1 ? state.machineInputAFromMachine : state.machineInputBFromMachine;
+    if (value == null) return;
+
+    if (isMachineTile) {
+      final updatedMachine = List<String>.from(state.machineTiles);
+      updatedMachine.add(value);
+      state = state.copyWith(
+        machineTiles: updatedMachine,
+        clearMachineA: slot == 1,
+        clearMachineB: slot == 2,
+      );
+    } else {
+      final updatedFooter = List<String>.from(state.currentLevel!.footerTiles);
+      updatedFooter.add(value);
+      state = state.copyWith(
+        currentLevel: PuzzleLevel(
+          id: state.currentLevel!.id,
+          size: state.currentLevel!.size,
+          cells: state.currentLevel!.cells,
+          footerTiles: updatedFooter,
+          machineTiles: state.machineTiles,
+        ),
+        clearMachineA: slot == 1,
+        clearMachineB: slot == 2,
+      );
+    }
+  }
+
+  void toggleMachineOp() {
+    state = state.copyWith(machineOp: state.machineOp == '+' ? '-' : '+');
+  }
+
+  void fuseNumbers() {
+    if (state.machineInputA == null || state.machineInputB == null) return;
+
+    final valA = int.tryParse(state.machineInputA!) ?? 0;
+    final valB = int.tryParse(state.machineInputB!) ?? 0;
+    int result = 0;
+
+    if (state.machineOp == '+') {
+      result = valA + valB;
+    } else {
+      result = valA - valB;
+    }
+
+    // No permitimos resultados negativos por ahora para no complicar el tablero
+    if (result < 0) {
+      state = state.copyWith(message: 'negative_error');
+      return;
+    }
+
+    final resStr = result.toString();
+
+    state = state.copyWith(
+      machineResult: resStr,
+      machineLastInputA: state.machineInputA,
+      machineLastInputB: state.machineInputB,
+      machineLastInputAFromMachine: state.machineInputAFromMachine,
+      machineLastInputBFromMachine: state.machineInputBFromMachine,
+      machineLastOp: state.machineOp,
+      clearMachineA: true,
+      clearMachineB: true,
+      message: 'fusion_success|res:$result',
+    );
+    SoundService.playSuccess();
+  }
+
+  /// Deshace la fusión y devuelve los ingredientes.
+  void breakResult() {
+    if (state.machineResult == null) return;
+
+    final valA = state.machineLastInputA;
+    final valB = state.machineLastInputB;
+    final fromMachineA = state.machineLastInputAFromMachine;
+    final fromMachineB = state.machineLastInputBFromMachine;
+
+    if (valA != null) addToMachine(1, valA, isMachineTile: fromMachineA);
+    if (valB != null) addToMachine(2, valB, isMachineTile: fromMachineB);
+
+    state = state.copyWith(
+      clearMachineResult: true,
+      message: 'fusion_undo',
+    );
+  }
+
+  /// Limpia la máquina cuando el resultado se usa en el tablero.
+  void useMachineResult() {
+    state = state.copyWith(clearMachineResult: true);
   }
 
   @override

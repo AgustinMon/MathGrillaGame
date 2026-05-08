@@ -5,12 +5,14 @@ class MathTile extends StatelessWidget {
   final String value;
   final bool isDragging;
   final double size;
+  final Color? color;
 
   const MathTile({
     super.key,
     required this.value,
     this.isDragging = false,
     this.size = 60,
+    this.color,
   });
 
   @override
@@ -21,8 +23,8 @@ class MathTile extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.primaryBlue,
-            AppTheme.secondaryPurple,
+            color ?? AppTheme.primaryBlue,
+            color?.withOpacity(0.8) ?? AppTheme.secondaryPurple,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -30,7 +32,7 @@ class MathTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(size * 0.2),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryBlue.withOpacity(0.3),
+            color: (color ?? AppTheme.primaryBlue).withOpacity(0.3),
             blurRadius: 8,
             offset: Offset(0, size * 0.06),
           ),

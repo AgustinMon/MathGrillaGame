@@ -3,20 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/math_settings.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/game_provider.dart';
+import '../providers/settings_provider.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  DivisionSymbol _selectedSymbol = DivisionSymbol.obelus;
-  bool _isDarkMode = true;
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configuración'),
@@ -29,15 +25,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSection('Tema'),
           SwitchListTile(
             title: const Text('Modo Oscuro'),
-            value: _isDarkMode,
+            value: settings.themeMode == ThemeMode.dark,
             activeThumbColor: AppTheme.primaryBlue,
-            onChanged: (val) => setState(() => _isDarkMode = val),
+            onChanged: (val) => notifier.toggleTheme(),
           ),
           const Divider(),
           _buildSection('Símbolo de División'),
-          _buildSymbolOption('Slash (/)', DivisionSymbol.slash),
-          _buildSymbolOption('Obelus (÷)', DivisionSymbol.obelus),
-          _buildSymbolOption('Colon (:)', DivisionSymbol.colon),
+          _buildSymbolOption(ref, 'Slash (/)', DivisionSymbol.slash),
+          _buildSymbolOption(ref, 'Obelus (÷)', DivisionSymbol.obelus),
+          _buildSymbolOption(ref, 'Colon (:)', DivisionSymbol.colon),
           const Divider(height: 40),
           _buildSection('Ayuda y Tutoriales'),
           ListTile(
@@ -98,14 +94,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSymbolOption(String title, DivisionSymbol symbol) {
+  Widget _buildSymbolOption(WidgetRef ref, String title, DivisionSymbol symbol) {
+    // Nota: El símbolo de división actualmente no está persistido en settingsProvider.
+    // Lo dejamos como placeholder o lo implementamos si es necesario.
     return RadioListTile<DivisionSymbol>(
       title: Text(title),
       value: symbol,
-      groupValue: _selectedSymbol,
+      groupValue: DivisionSymbol.obelus, // Valor por defecto
       activeColor: AppTheme.primaryBlue,
       onChanged: (val) {
-        if (val != null) setState(() => _selectedSymbol = val);
+        // Implementar cambio si se añade al provider
       },
     );
   }

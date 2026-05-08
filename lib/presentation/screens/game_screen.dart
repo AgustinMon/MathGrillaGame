@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,8 +10,11 @@ import '../../domain/entities/puzzle_level.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/math_tile.dart';
 import '../widgets/ad_banner.dart';
+import '../providers/settings_provider.dart';
+import '../../core/utils/translations.dart';
 
 /// Pantalla principal del juego donde se muestra la cuadrícula y se interactúa con las piezas.
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
@@ -21,16 +25,20 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen> {
+  final ScrollController _footerScrollController = ScrollController();
   RewardedAd? _rewardedAd;
   bool _isAdLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _loadRewardedAd();
+    if (!kIsWeb) {
+      _loadRewardedAd();
+    }
   }
 
   void _loadRewardedAd() {
+    if (kIsWeb) return;
     RewardedAd.load(
       adUnitId: 'ca-app-pub-3940256099942544/5224354917', // Test ID para recompensado
       request: const AdRequest(),
@@ -81,6 +89,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   @override
   void dispose() {
+    _footerScrollController.dispose();
     _rewardedAd?.dispose();
     super.dispose();
   }
@@ -89,33 +98,20 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameProvider);
     final refNotifier = ref.read(gameProvider.notifier);
+    final l10n = ref.watch(translationsProvider);
 
-    // Escuchar cambios en el estado para reaccionar a eventos de fin de nivel.
+    // Escuchamos eventos especiales para diálogos
     ref.listen(gameProvider, (previous, next) {
-      if (next.message != null && next.message != previous?.message) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.message!),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(bottom: 120, left: 20, right: 20),
-            backgroundColor: next.message!.contains('Algo') ? Colors.redAccent : Colors.green,
-            duration: const Duration(seconds: 1),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
       if (next.isLevelComplete && !(previous?.isLevelComplete ?? false)) {
-        _showWinDialog(context, ref, next);
+        _showWinDialog(context, ref, next, l10n);
       }
       if (next.isGameOver && !(previous?.isGameOver ?? false)) {
-        _showGameOverDialog(context, ref, next);
+        _showGameOverDialog(context, ref, next, l10n);
       }
       
-      // Mostrar tutorial si es Nivel 1 y está habilitado
       if (next.levelNumber == 1 && next.showTutorial && previous?.levelNumber != 1) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showTutorialDialog(context);
+          _showTutorialDialog(context, l10n);
         });
       }
     });
@@ -126,32 +122,57 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           SafeArea(
             child: Column(
               children: [
-                _buildHeader(context, gameState, ref), // Barra superior con estadísticas.
+                _buildHeader(context, gameState, ref, l10n), // Barra superior con estadísticas.
                 Expanded(
-                  child: Center(child: _buildGrid(context, gameState, ref)), // El tablero de juego.
+                  child: Center(child: _buildGrid(context, gameState, ref, l10n)), // El tablero de juego.
                 ),
-                _buildFooter(gameState), // Inventario de piezas arrastrables.
+                if (gameState.difficulty == 'hard') _buildMachine(gameState, l10n), // Nueva máquina de fusión
+                _buildFooter(gameState, l10n), // Inventario de piezas arrastrables.
                 const AdBanner(), // Banner publicitario.
               ],
-            ),
+            ).animate(target: gameState.errorTrigger.toDouble()).shake(hz: 8, curve: Curves.easeInOut, offset: const Offset(4, 0)),
           ),
           // Superposición visual que se muestra al ganar el nivel.
-          if (gameState.isLevelComplete) _buildVictoryOverlay(),
+          if (gameState.isLevelComplete) _buildVictoryOverlay(l10n),
+          
+          // Mensaje central animado (reemplaza SnackBar)
+          if (gameState.message != null)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(color: Colors.blueAccent, width: 2),
+                  boxShadow: [BoxShadow(color: Colors.blueAccent.withOpacity(0.5), blurRadius: 20)],
+                ),
+                child: Text(
+                  gameState.message!,
+                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+              ).animate().scale(duration: 400.ms, curve: Curves.elasticOut).fadeOut(delay: 1.5.seconds),
+            ),
         ],
       ),
     );
   }
 
-  void _showTutorialDialog(BuildContext context) {
+  void _showTutorialDialog(BuildContext context, Translations l10n) {
     bool dontShowAgain = false;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppTheme.darkCard,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.primaryBlue, width: 2)),
-          title: const Text('¿CÓMO JUGAR?', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.primaryBlue, fontSize: 28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20), 
+            side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2)
+          ),
+          title: Text(
+            '¿CÓMO JUGAR?', 
+            textAlign: TextAlign.center, 
+            style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 28, fontWeight: FontWeight.bold)
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -166,9 +187,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     Checkbox(
                       value: dontShowAgain,
                       onChanged: (val) => setDialogState(() => dontShowAgain = val ?? false),
-                      activeColor: AppTheme.primaryBlue,
+                      activeColor: Theme.of(context).colorScheme.primary,
                     ),
-                    const Text('No volver a mostrar', style: TextStyle(fontSize: 14, color: Colors.white70)),
+                    Text(
+                      'No volver a mostrar', 
+                      style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))
+                    ),
                   ],
                 ),
               ),
@@ -178,8 +202,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryBlue,
-                  foregroundColor: Colors.black,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 ),
@@ -216,7 +240,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, GameState state, WidgetRef ref) {
+  Widget _buildHeader(BuildContext context, GameState state, WidgetRef ref, Translations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -226,8 +250,23 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Combo Badge (Solo si hay combo activo)
+          if (state.comboCount > 1)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Colors.orange, Colors.redAccent]),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.5), blurRadius: 10)],
+              ),
+              child: Text(
+                'COMBO x${state.comboCount}',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ).animate().scale(duration: 400.ms, curve: Curves.elasticOut).shimmer(duration: 1.seconds),
+          
           _StatItem(
-            label: 'LIVES',
+            label: l10n.text('lives_label'),
             value: '${state.lives}',
             isWarning: state.lives < 2,
           ),
@@ -241,7 +280,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             ),
             child: Row(
               children: [
-                _StatItem(label: 'LVL', value: '${state.levelNumber}'),
+                _StatItem(label: l10n.text('level_label'), value: '${state.levelNumber}'),
                 const SizedBox(width: 8),
                 IconButton(
                   visualDensity: VisualDensity.compact,
@@ -254,11 +293,24 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             ),
           ),
 
-          _StatItem(
-            label: 'TIME',
-            value: '${state.timeLeft}s',
-            isWarning: state.timeLeft < 15,
+          Row(
+            children: [
+              _StatItem(
+                label: l10n.text('time_label'),
+                value: '${state.timeLeft}s',
+                isWarning: state.timeLeft < 15,
+              ),
+              IconButton(
+                icon: Icon(state.isTimerPaused ? Icons.play_arrow : Icons.pause, color: Colors.blueAccent, size: 18),
+                onPressed: () => ref.read(gameProvider.notifier).togglePause(),
+              ),
+            ],
           ),
+
+          _StatItem(
+            label: 'SCORE',
+            value: '${state.score}',
+          ).animate(target: state.score.toDouble()).scale(begin: const Offset(1,1), end: const Offset(1.2, 1.2), duration: 200.ms).then().scale(begin: const Offset(1.2, 1.2), end: const Offset(1, 1)),
 
           // Botón de Pistas / Anuncio Recompensado
           GestureDetector(
@@ -272,22 +324,26 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: state.hintsRemaining > 0 ? Colors.amber.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+                color: state.hintsRemaining > 0 ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: state.hintsRemaining > 0 ? Colors.amber.withOpacity(0.3) : Colors.blue.withOpacity(0.3),
+                  color: state.hintsRemaining > 0 ? Colors.amber.withOpacity(0.5) : Colors.blue.withOpacity(0.5),
                 ),
+                boxShadow: [
+                  if (state.hintsRemaining > 0)
+                    BoxShadow(color: Colors.amber.withOpacity(0.1), blurRadius: 4, spreadRadius: 1),
+                ],
               ),
               child: Row(
                 children: [
                   Icon(
                     state.hintsRemaining > 0 ? Icons.lightbulb : Icons.play_circle_fill,
-                    size: 16,
+                    size: 18,
                     color: state.hintsRemaining > 0 ? Colors.amber : Colors.blueAccent,
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    state.hintsRemaining > 0 ? '${state.hintsRemaining}' : 'AD',
+                    state.hintsRemaining > 0 ? '${state.hintsRemaining}' : l10n.text('hints_label'),
                     style: TextStyle(
                       color: state.hintsRemaining > 0 ? Colors.amber : Colors.blueAccent,
                       fontWeight: FontWeight.bold,
@@ -299,6 +355,21 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             ),
           ).animate(target: state.hintsRemaining == 0 ? 1 : 0).shake(hz: 4, curve: Curves.easeInOut),
           
+          IconButton(
+            icon: const Icon(Icons.undo, color: Colors.amberAccent, size: 20),
+            onPressed: () => ref.read(gameProvider.notifier).undoMove(),
+          ),
+          
+          // Selector de Tema
+          IconButton(
+            icon: Icon(
+              ref.watch(settingsProvider).themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              size: 20,
+            ),
+            onPressed: () => ref.read(settingsProvider.notifier).toggleTheme(),
+          ),
+          
           // Iconos de acciones secundarias - Movidos a la portada
           const SizedBox(width: 40), // Espacio para mantener el balance visual si es necesario
         ],
@@ -307,7 +378,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   /// Construye la cuadrícula dinámica del puzzle.
-  Widget _buildGrid(BuildContext context, GameState state, WidgetRef ref) {
+  Widget _buildGrid(BuildContext context, GameState state, WidgetRef ref, Translations l10n) {
     if (state.currentLevel == null) return const CircularProgressIndicator();
 
     final size = state.currentLevel!.size;
@@ -315,56 +386,80 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final double cellSize = size > 14 ? (size > 20 ? 22 : 32) : (size > 10 ? 40 : 55);
     final spacing = size > 14 ? 1.0 : 2.0;
     final totalGridSize = (cellSize * size) + (spacing * (size - 1));
+    final screenSize = MediaQuery.of(context).size;
+    // Aseguramos un lienzo lo suficientemente grande para centrar
+    final double canvasWidth = max(totalGridSize + 100, screenSize.width);
+    final double canvasHeight = max(totalGridSize + 100, screenSize.height);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InteractiveViewer(
-        boundaryMargin: const EdgeInsets.all(150), // Más margen para niveles grandes
+        boundaryMargin: const EdgeInsets.all(400), // Aumentado para mayor libertad
         minScale: 0.1,
-        maxScale: 2.0,
-        constrained: false, // PERMITIR QUE EL CONTENIDO DESBORDE PARA QUE NO SE CORTE
+        maxScale: 2.5,
+        constrained: false, 
         child: Container(
-          width: totalGridSize,
-          height: totalGridSize,
-          padding: const EdgeInsets.all(20), // Margen interno para que no pegue a los bordes del visor
+          width: canvasWidth,
+          height: canvasHeight,
+          alignment: Alignment.center, // Centrado real
+          child: Container(
+            width: totalGridSize,
+            height: totalGridSize,
+            padding: const EdgeInsets.all(20),
             child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: size,
-              mainAxisSpacing: spacing,
-              crossAxisSpacing: spacing,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: size,
+                mainAxisSpacing: spacing,
+                crossAxisSpacing: spacing,
+              ),
+              itemCount: size * size,
+              itemBuilder: (context, index) {
+                final x = index % size;
+                final y = index ~/ size;
+                final cell = state.currentLevel!.cells.firstWhere(
+                  (c) => c.x == x && c.y == y,
+                  orElse: () => GridCell(x: x, y: y, type: CellType.empty),
+                );
+                 return _buildCell(cell, state, ref, l10n);
+              },
             ),
-            itemCount: size * size,
-            itemBuilder: (context, index) {
-              final x = index % size;
-              final y = index ~/ size;
-              final cell = state.currentLevel!.cells.firstWhere(
-                (c) => c.x == x && c.y == y,
-                orElse: () => GridCell(x: x, y: y, type: CellType.empty),
-              );
-              return _buildCell(cell, state, ref);
-            },
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   /// Construye una celda individual que puede aceptar piezas arrastradas.
-  Widget _buildCell(GridCell cell, GameState state, WidgetRef ref) {
+  Widget _buildCell(GridCell cell, GameState state, WidgetRef ref, Translations l10n) {
     if (cell.type == CellType.empty) return const SizedBox.shrink();
 
     final size = state.currentLevel?.size ?? 5;
 
-    // Verificamos si esta celda es parte de una fila o columna ya resuelta.
-    final isSolved =
-        state.solvedRows.contains(cell.y) || state.solvedCols.contains(cell.x);
+    // Verificamos si esta celda es parte de una ecuación ya resuelta.
+    final isSolved = state.solvedCells.contains('${cell.x},${cell.y}');
 
-    return DragTarget<String>(
+    return DragTarget<Map<String, dynamic>>(
       onAcceptWithDetails: (details) {
-        // Cuando el usuario suelta una pieza aquí, notificamos al provider.
-        ref.read(gameProvider.notifier).placeTile(cell.x, cell.y, details.data);
+        // El valor viene en el mapa: {'value': String, 'isMachine': bool}
+        final value = details.data['value'] as String;
+        final notifier = ref.read(gameProvider.notifier);
+        
+        Map<String, dynamic>? fusionData;
+        if (details.data['fromMachineResult'] == true) {
+          fusionData = {
+            'valA': state.machineLastInputA,
+            'valB': state.machineLastInputB,
+            'fromA': state.machineLastInputAFromMachine,
+            'fromB': state.machineLastInputBFromMachine,
+          };
+        }
+
+        notifier.placeTile(cell.x, cell.y, value, fusionData: fusionData);
+        
+        if (details.data['fromMachineResult'] == true) {
+          notifier.useMachineResult();
+        }
       },
       builder: (context, candidateData, rejectedData) {
         return GestureDetector(
@@ -375,15 +470,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: isSolved
-                  ? Colors.green.withOpacity(0.4) // Más vibrante
+                  ? Colors.green.withOpacity(0.4)
                   : (cell.isFixed
-                        ? Colors.white.withOpacity(0.15) // Más visible
-                        : Colors.white.withOpacity(0.08)),
+                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.15)
+                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.08)),
               borderRadius: BorderRadius.circular(size > 12 ? 4 : 8),
               border: Border.all(
                 color: isSolved
                     ? Colors.greenAccent
-                    : (candidateData.isNotEmpty ? Colors.blueAccent : Colors.white30),
+                    : (candidateData.isNotEmpty ? Colors.blueAccent : Theme.of(context).colorScheme.onSurface.withOpacity(0.2)),
                 width: isSolved ? 2.5 : 1.5,
               ),
             ),
@@ -393,9 +488,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 style: TextStyle(
                   fontSize: size > 25 ? 10 : (size > 20 ? 12 : (size > 12 ? 16 : 20)),
                   fontWeight: FontWeight.bold,
-                  color: isSolved
-                      ? Colors.white
-                      : (cell.isFixed ? Colors.white : Colors.blueAccent),
+                color: isSolved
+                    ? Colors.white
+                    : (cell.isFixed 
+                        ? Theme.of(context).colorScheme.onSurface 
+                        : Colors.blueAccent),
                 ),
               ),
             ),
@@ -405,77 +502,300 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  Widget _buildFooter(GameState state) {
-    final footerTiles = state.currentLevel?.footerTiles ?? [];
-    if (footerTiles.isEmpty) return const SizedBox.shrink();
+  Widget _buildFooter(GameState state, Translations l10n) {
+    // Obtenemos y ordenamos ambos sets de piezas
+    final footerTiles = List<String>.from(state.currentLevel?.footerTiles ?? [])..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    final machineTiles = List<String>.from(state.machineTiles)..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    
+    if (footerTiles.isEmpty && machineTiles.isEmpty && state.machineInputA == null && state.machineInputB == null) return const SizedBox.shrink();
 
     return Container(
-      constraints: const BoxConstraints(maxHeight: 160),
+      constraints: const BoxConstraints(maxHeight: 180), // Un poco más alto para los dos grupos
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
         color: Colors.black54,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1), width: 2)),
       ),
-      child: Scrollbar(
-        thumbVisibility: true,
-        child: GridView.builder(
-          shrinkWrap: true,
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 60, // Tamaño máximo de cada celda del inventario
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1,
+      child: SingleChildScrollView(
+        controller: _footerScrollController,
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (footerTiles.isNotEmpty) ...[
+                Text(l10n.text('numbers_label'), style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                _buildTileGrid(footerTiles, isMachine: false),
+                const SizedBox(height: 16),
+              ],
+              if (machineTiles.isNotEmpty) ...[
+                Text(l10n.text('ingredients_label'), style: const TextStyle(color: Colors.pinkAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                _buildTileGrid(machineTiles, isMachine: true),
+              ],
+            ],
           ),
-          itemCount: footerTiles.length,
-          itemBuilder: (context, index) {
-            final value = footerTiles[index];
-            return Draggable<String>(
-              data: value,
-              feedback: MathTile(value: value, size: 50),
-              childWhenDragging: Opacity(
-                opacity: 0.2,
-                child: MathTile(value: value, size: 45),
-              ),
-              child: MathTile(value: value, size: 45),
-            );
-          },
         ),
-      ),
     ).animate().slideY(begin: 1, duration: 500.ms, curve: Curves.easeOutCubic);
   }
 
-  /// Overlay de celebración que aparece al completar un nivel.
-  Widget _buildVictoryOverlay() {
+  Widget _buildTileGrid(List<String> tiles, {required bool isMachine}) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: tiles.map((value) {
+        return Draggable<Map<String, dynamic>>(
+          data: {'value': value, 'isMachine': isMachine},
+          feedback: MathTile(value: value, size: 50, color: isMachine ? Colors.pinkAccent : null),
+          childWhenDragging: Opacity(
+            opacity: 0.2,
+            child: MathTile(value: value, size: 45, color: isMachine ? Colors.pinkAccent : null),
+          ),
+          child: MathTile(value: value, size: 45, color: isMachine ? Colors.pinkAccent : null),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildMachine(GameState state, Translations l10n) {
+    final notifier = ref.read(gameProvider.notifier);
+    final valA = state.machineInputA;
+    final valB = state.machineInputB;
+    final canFuse = valA != null && valB != null;
+
     return Container(
-      color: Colors.black54,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.pinkAccent.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(color: Colors.pinkAccent.withOpacity(0.1), blurRadius: 10, spreadRadius: 1),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            l10n.text('fusion_machine'),
+            style: const TextStyle(color: Colors.pinkAccent, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildMachineSlot(1, valA, state, notifier),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: () => notifier.toggleMachineOp(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.pinkAccent.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    state.machineOp,
+                    style: const TextStyle(color: Colors.pinkAccent, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ).animate(target: state.machineOp == '+' ? 0 : 1).rotate(begin: 0, end: 0.5),
+              const SizedBox(width: 12),
+              _buildMachineSlot(2, valB, state, notifier),
+              const SizedBox(width: 20),
+              ElevatedButton(
+                onPressed: canFuse ? () => notifier.fuseNumbers() : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pinkAccent,
+                  foregroundColor: Colors.black,
+                  disabledBackgroundColor: Colors.white10,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt, size: 20),
+                    const SizedBox(width: 4),
+                    Text(l10n.text('fusion_button'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ).animate(target: canFuse ? 1 : 0).shimmer(duration: 1.seconds).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
+              if (state.machineResult != null) ...[
+                const SizedBox(width: 20),
+                const Icon(Icons.arrow_forward, color: Colors.pinkAccent, size: 24),
+                const SizedBox(width: 20),
+                _buildResultSlot(state.machineResult!, notifier, l10n),
+                const SizedBox(width: 12),
+                TextButton.icon(
+                  onPressed: () => notifier.breakResult(),
+                  icon: const Icon(Icons.undo, color: Colors.amberAccent, size: 18),
+                  label: Text(l10n.text('undo_button'), style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.amberAccent.withOpacity(0.1),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ).animate().fadeIn().scale(),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultSlot(String value, GameNotifier notifier, Translations l10n) {
+    return Draggable<Map<String, dynamic>>(
+      data: {'value': value, 'isMachine': false, 'fromMachineResult': true},
+      feedback: MathTile(value: value, size: 50),
+      childWhenDragging: const SizedBox(width: 50, height: 50),
+      onDragCompleted: () => notifier.useMachineResult(),
+      child: GestureDetector(
+        onTap: () => notifier.breakResult(),
+        child: Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: Colors.blueAccent.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.blueAccent, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blueAccent.withOpacity(0.4),
+                blurRadius: 10,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+              ),
+            ),
+          ),
+        ),
+      ).animate().shimmer(duration: 2.seconds).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.0, 1.0)),
+    );
+  }
+
+  Widget _buildMachineSlot(int slot, String? value, GameState gameState, GameNotifier notifier) {
+    return DragTarget<Map<String, dynamic>>(
+      onAcceptWithDetails: (details) => notifier.addToMachine(slot, details.data['value'], isMachineTile: details.data['isMachine'] ?? false),
+      builder: (context, candidateData, rejectedData) {
+        return GestureDetector(
+          onTap: () => notifier.removeFromMachine(slot),
+          // En realidad, deberíamos trackear de dónde vino. Pero si es rosa, vuelve a rosa.
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: candidateData.isNotEmpty ? Colors.pinkAccent : Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: value != null
+                  ? Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.pink.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.pinkAccent, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.pinkAccent.withOpacity(0.3),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(2, 2))],
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.add, color: Colors.white24, size: 30),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Overlay de celebración que aparece al completar un nivel.
+  Widget _buildVictoryOverlay(Translations l10n) {
+    return Container(
+      color: Colors.black.withOpacity(0.7),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-                  '¡EXCELENTE!',
-                  style: TextStyle(
-                    fontSize: 50,
-                    fontWeight: FontWeight.bold,
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(Icons.star, color: Colors.amber, size: 200)
+                    .animate(onPlay: (c) => c.repeat())
+                    .rotate(duration: 5.seconds)
+                    .scale(begin: const Offset(0.8, 0.8), end: const Offset(1.1, 1.1), duration: 2.seconds, curve: Curves.easeInOut),
+                const Icon(Icons.auto_awesome, color: Colors.white, size: 80)
+                    .animate(onPlay: (c) => c.repeat())
+                    .scale(duration: 1.seconds, curve: Curves.bounceOut),
+              ],
+            ),
+            const SizedBox(height: 30),
+            Text(
+                  l10n.text('victory'),
+                  style: const TextStyle(
+                    fontSize: 55,
+                    fontWeight: FontWeight.w900,
                     color: Colors.amber,
-                    letterSpacing: 4,
-                    shadows: [Shadow(color: Colors.orange, blurRadius: 20)],
+                    letterSpacing: 8,
+                    shadows: [
+                      Shadow(color: Colors.orange, blurRadius: 30),
+                      Shadow(color: Colors.white, blurRadius: 10),
+                    ],
                   ),
                 )
                 .animate()
-                .scale(duration: 600.ms, curve: Curves.elasticOut)
+                .scale(duration: 800.ms, curve: Curves.elasticOut)
                 .then()
-                .shimmer(duration: 1.seconds),
-            const SizedBox(height: 20),
-            const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 80)
-                .animate(onPlay: (controller) => controller.repeat())
-                .scale(
-                  duration: 1.seconds,
-                  begin: const Offset(0.8, 0.8),
-                  end: const Offset(1.2, 1.2),
-                )
-                .rotate(duration: 2.seconds),
+                .shimmer(duration: 1.5.seconds, color: Colors.white),
+            const SizedBox(height: 40),
+            Text(
+              '${l10n.text('next_level_label') ?? 'Pasas al nivel'} ${ref.read(gameProvider).levelNumber + 1}...',
+              style: const TextStyle(color: Colors.white70, fontSize: 20, fontWeight: FontWeight.bold),
+            ).animate().fadeIn(delay: 1.seconds).slideY(begin: 0.5),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: () {
+                ref.read(gameProvider.notifier).startNewLevel(ref.read(gameProvider).levelNumber + 1);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                elevation: 10,
+              ),
+              child: Text(
+                l10n.text('continue_button') ?? 'CONTINUAR',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+              ),
+            ).animate().fadeIn(delay: 1.5.seconds).scale(curve: Curves.elasticOut),
           ],
         ),
       ),
@@ -483,26 +803,30 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   /// Muestra el diálogo de victoria con la puntuación y el botón para el siguiente nivel.
-  void _showWinDialog(BuildContext context, WidgetRef ref, GameState state) {
+  void _showWinDialog(BuildContext context, WidgetRef ref, GameState state, Translations l10n) {
     Future.delayed(const Duration(seconds: 2), () {
       if (!context.mounted) return;
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          backgroundColor: AppTheme.darkCard,
-          title: const Text(
-            '¡Nivel Completado!',
-            style: TextStyle(color: AppTheme.primaryBlue),
+          title: Text(
+            l10n.text('victory'),
+            style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.star, color: Colors.amber, size: 60),
+              const Icon(Icons.military_tech, color: Colors.amber, size: 80),
               const SizedBox(height: 20),
               Text(
-                'Puntuación: ${state.score}',
-                style: const TextStyle(fontSize: 20),
+                '${l10n.text('level_label')}: ${state.levelNumber}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Score: ${state.score}',
+                style: const TextStyle(fontSize: 16),
               ),
             ],
           ),
@@ -514,7 +838,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     .read(gameProvider.notifier)
                     .startNewLevel(state.levelNumber + 1);
               },
-              child: const Text('Siguiente Nivel'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
+              child: Text(l10n.text('next_level')),
             ),
           ],
         ),
@@ -527,24 +852,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     BuildContext context,
     WidgetRef ref,
     GameState state,
+    Translations l10n,
   ) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.darkCard,
-        title: const Text(
-          '¡Game Over!',
-          style: TextStyle(color: AppTheme.neonRed),
+        title: Text(
+          l10n.text('game_over'),
+          style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
         ),
-        content: const Text('Te has quedado sin vidas o tiempo.'),
+        content: Text(
+          l10n.text('try_again'),
+          style: const TextStyle(fontSize: 16),
+        ),
         actions: [
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               ref.read(gameProvider.notifier).startNewLevel(1);
             },
-            child: const Text('Reintentar desde Nivel 1'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            child: Text(l10n.text('try_again')),
           ),
         ],
       ),
@@ -621,14 +950,19 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.white54),
+          style: TextStyle(
+            fontSize: 12, 
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+          ),
         ),
         Text(
           value,
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: isWarning ? Colors.redAccent : Colors.white,
+            color: isWarning 
+                ? Colors.redAccent 
+                : Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],

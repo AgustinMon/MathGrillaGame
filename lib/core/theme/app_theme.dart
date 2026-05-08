@@ -48,13 +48,32 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+    scaffoldBackgroundColor: const Color(0xFFF8FAFC),
     colorScheme: const ColorScheme.light(
-      primary: Color(0xFF2D3436),
-      secondary: Color(0xFF6C5CE7),
+      primary: Color(0xFF2563EB),
+      secondary: Color(0xFF7C3AED),
       surface: Colors.white,
-      error: Color(0xFFD63031),
+      error: Color(0xFFEF4444),
+      onSurface: Color(0xFF1E293B),
     ),
-    textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme),
+    textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme).copyWith(
+      displayLarge: GoogleFonts.outfit(
+        fontSize: 32,
+        fontWeight: FontWeight.bold,
+        color: const Color(0xFF1E293B),
+      ),
+      bodyLarge: GoogleFonts.outfit(
+        fontSize: 18,
+        color: const Color(0xFF334155),
+      ),
+    ),
+    cardTheme: CardThemeData(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.withOpacity(0.1)),
+      ),
+    ),
   );
 }

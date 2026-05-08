@@ -32,7 +32,11 @@ class MathEngine {
     
     // Si tenemos el nivel pre-diseñado para esta dificultad, lo usamos.
     if (levelId > 0 && levelId <= list.length) {
-      return list[levelId - 1];
+      final level = list[levelId - 1];
+      if (difficulty == 'hard') {
+        return _applyHardModeSplitting(level);
+      }
+      return level;
     }
 
     // Fallback procedural con lógica escalada
@@ -81,12 +85,19 @@ class MathEngine {
       // Si el nivel tiene al menos 2 o 3 operaciones, lo aceptamos.
       if (successfulOps >= (levelId < 5 ? 2 : 3)) {
         footerTiles.shuffle();
-        return PuzzleLevel(
+        
+        final baseLevel = PuzzleLevel(
           id: levelId,
           size: size,
           cells: cells,
           footerTiles: footerTiles,
         );
+
+        if (difficulty == 'hard') {
+          return _applyHardModeSplitting(baseLevel);
+        }
+
+        return baseLevel;
       }
     }
 
@@ -364,6 +375,36 @@ class MathEngine {
      List<String> footer = [];
      _addOperation(cells, 0, 2, true, footer, ['+', '-'], size, id);
      return PuzzleLevel(id: id, size: size, cells: cells, footerTiles: footer);
+  }
+
+  static PuzzleLevel _applyHardModeSplitting(PuzzleLevel level) {
+    List<String> machineTiles = [];
+    List<String> newFooter = [];
+    int splitCount = 0;
+    bool hasSplit = false;
+    
+    for (var tile in level.footerTiles) {
+      int? val = int.tryParse(tile);
+      // Limitamos a un máximo de 3 splits (6 números rosas) para que no sea frustrante
+      if (val != null && val > 2 && splitCount < 3 && (_random.nextDouble() < 0.7 || !hasSplit)) {
+        int a = _random.nextInt(val - 1) + 1;
+        int b = val - a;
+        machineTiles.add(a.toString());
+        machineTiles.add(b.toString());
+        hasSplit = true;
+        splitCount++;
+      } else {
+        newFooter.add(tile);
+      }
+    }
+    
+    return PuzzleLevel(
+      id: level.id,
+      size: level.size,
+      cells: level.cells,
+      footerTiles: newFooter,
+      machineTiles: machineTiles,
+    );
   }
 
   static CellType _getCellType(String val) {
