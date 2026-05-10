@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'game_screen.dart';
@@ -6,12 +7,74 @@ import 'settings_screen.dart';
 import 'medals_screen.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/game_provider.dart';
+import '../providers/settings_provider.dart';
 
-class TutorialScreen extends ConsumerWidget {
+class TutorialScreen extends ConsumerStatefulWidget {
   const TutorialScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TutorialScreen> createState() => _TutorialScreenState();
+}
+
+class _TutorialScreenState extends ConsumerState<TutorialScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkConsent();
+    });
+  }
+
+  void _checkConsent() {
+    final settings = ref.read(settingsProvider);
+    if (settings.consentAccepted == null && settings.geography != 'global') {
+      _showConsentDialog();
+    }
+  }
+
+  void _showConsentDialog() {
+    final settings = ref.read(settingsProvider);
+    final isUE = settings.geography == 'ue';
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.darkCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.primaryBlue, width: 2)),
+        title: Text(
+          isUE ? 'Privacidad (GDPR - UE)' : 'Privacidad (CCPA - USA)',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          isUE 
+            ? 'Para cumplir con las normas de la UE, necesitamos tu consentimiento para mostrarte anuncios personalizados.' 
+            : 'Para cumplir con las normas de USA, te informamos que recolectamos datos para mejorar tu experiencia.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ref.read(settingsProvider.notifier).setConsent(false);
+              Navigator.pop(context);
+            },
+            child: const Text('RECHAZAR', style: TextStyle(color: Colors.redAccent)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(settingsProvider.notifier).setConsent(true);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue),
+            child: const Text('ACEPTAR', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final difficulty = ref.watch(gameProvider).difficulty;
 
     return Scaffold(
@@ -30,23 +93,36 @@ class TutorialScreen extends ConsumerWidget {
             ),
           ),
           
-          // Símbolos matemáticos flotantes de fondo
-          ...List.generate(10, (index) {
+          // Símbolos matemáticos flotantes de fondo repartidos por toda la pantalla
+          ...List.generate(15, (index) {
             final symbols = ['+', '-', '×', '÷', '=', '%', '√'];
-            final random = index * 7;
+            final screenSize = MediaQuery.of(context).size;
+            
+            // Distribución pseudo-aleatoria basada en el índice y tamaño de pantalla
+            final left = (index * 0.17 * screenSize.width) % screenSize.width;
+            final top = (index * 0.13 * screenSize.height) % screenSize.height;
+            final rotation = (index * 45).toDouble();
+            
             return Positioned(
-              left: (random % 300).toDouble(),
-              top: (random % 600).toDouble(),
-              child: Opacity(
-                opacity: 0.03,
-                child: Text(
-                  symbols[index % symbols.length],
-                  style: const TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
+              left: left,
+              top: top,
+              child: Transform.rotate(
+                angle: rotation * (3.14159 / 180),
+                child: Opacity(
+                  opacity: 0.04,
+                  child: Text(
+                    symbols[index % symbols.length],
+                    style: const TextStyle(
+                      fontSize: 80, 
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ).animate(onPlay: (c) => c.repeat()).moveY(
-              begin: 0, end: 20, duration: (2000 + random % 1000).ms, curve: Curves.easeInOut
-            ).then().moveY(begin: 20, end: 0);
+              begin: 0, end: 30, duration: (3000 + (index * 500) % 2000).ms, curve: Curves.easeInOut
+            ).then().moveY(begin: 30, end: 0);
           }),
 
           SafeArea(
@@ -84,9 +160,9 @@ class TutorialScreen extends ConsumerWidget {
                     children: [
                       Text(
                         'CRUCI',
-                        style: TextStyle(
-                          fontFamily: 'Luckiest Guy',
+                        style: GoogleFonts.roboto(
                           fontSize: 64,
+                          fontWeight: FontWeight.w900,
                           height: 0.8,
                           color: Colors.white,
                           shadows: [
@@ -96,9 +172,9 @@ class TutorialScreen extends ConsumerWidget {
                       ).animate().fadeIn(duration: 600.ms).scale(begin: const Offset(0.5, 0.5)),
                       Text(
                         'MATH',
-                        style: TextStyle(
-                          fontFamily: 'Luckiest Guy',
+                        style: GoogleFonts.roboto(
                           fontSize: 80,
+                          fontWeight: FontWeight.w900,
                           height: 0.8,
                           color: AppTheme.primaryBlue,
                           shadows: [
@@ -112,12 +188,17 @@ class TutorialScreen extends ConsumerWidget {
                   const SizedBox(height: 60),
                   
                   // Selector de Dificultad mejorado
-                  _buildDifficultySelector(ref, difficulty),
+                  _buildDifficultySelector(difficulty),
 
                   const SizedBox(height: 40),
                   
                   // Botón Jugar Premium
                   _buildPlayButton(context),
+
+                  const SizedBox(height: 20),
+                  
+                  // Botón Juego del Día
+                  _buildDailyChallengeButton(context),
                   
                   const Spacer(flex: 2),
                 ],
@@ -129,7 +210,7 @@ class TutorialScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDifficultySelector(WidgetRef ref, String currentDifficulty) {
+  Widget _buildDifficultySelector(String currentDifficulty) {
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
@@ -202,5 +283,45 @@ class TutorialScreen extends ConsumerWidget {
       ),
     ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 2000.ms, color: Colors.white24)
      .animate(delay: 1500.ms).fadeIn().moveY(begin: 50);
+  }
+
+  Widget _buildDailyChallengeButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        ref.read(gameProvider.notifier).startDailyChallenge();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const GameScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        height: 60,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          color: Colors.white.withOpacity(0.1),
+          border: Border.all(color: Colors.amberAccent.withOpacity(0.5), width: 1.5),
+          boxShadow: [
+            BoxShadow(color: Colors.amberAccent.withOpacity(0.1), blurRadius: 10),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.calendar_today, color: Colors.amberAccent, size: 24),
+            const SizedBox(width: 12),
+            const Text(
+              'JUEGO DEL DÍA',
+              style: TextStyle(
+                fontFamily: 'Luckiest Guy',
+                fontSize: 20,
+                color: Colors.amberAccent,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: 1200.ms).slideX(begin: -0.1);
   }
 }

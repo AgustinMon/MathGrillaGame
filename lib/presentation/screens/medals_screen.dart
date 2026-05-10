@@ -12,7 +12,7 @@ class MedalsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Medallas'),
+        title: const Text('Sala de Trofeos'),
         backgroundColor: Colors.transparent,
       ),
       body: GridView.builder(
@@ -26,12 +26,13 @@ class MedalsScreen extends ConsumerWidget {
         itemCount: gameState.medals.length,
         itemBuilder: (context, index) {
           final medal = gameState.medals[index];
+          final theme = Theme.of(context);
           return Container(
             decoration: BoxDecoration(
-              color: medal.isUnlocked ? AppTheme.darkCard : Colors.black38,
+              color: medal.isUnlocked ? theme.colorScheme.surface : theme.colorScheme.onSurface.withOpacity(0.05),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: medal.isUnlocked ? AppTheme.primaryBlue : Colors.white12,
+                color: medal.isUnlocked ? AppTheme.primaryBlue : theme.colorScheme.onSurface.withOpacity(0.1),
                 width: 2,
               ),
             ),
@@ -39,9 +40,9 @@ class MedalsScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  medal.isUnlocked ? Icons.emoji_events : Icons.lock,
+                  medal.isUnlocked ? (medal.iconData as IconData) : Icons.lock,
                   size: 60,
-                  color: medal.isUnlocked ? Colors.amber : Colors.white24,
+                  color: medal.isUnlocked ? Colors.amber : theme.colorScheme.onSurface.withOpacity(0.2),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -49,7 +50,7 @@ class MedalsScreen extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: medal.isUnlocked ? Colors.white : Colors.white24,
+                    color: medal.isUnlocked ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withOpacity(0.3),
                   ),
                 ),
                 Padding(
@@ -57,7 +58,7 @@ class MedalsScreen extends ConsumerWidget {
                   child: Text(
                     medal.description,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 10, color: Colors.white54),
+                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface.withOpacity(0.5)),
                   ),
                 ),
               ],

@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import '../providers/game_provider.dart';
 import 'settings_screen.dart';
 import 'medals_screen.dart';
@@ -11,6 +13,7 @@ import '../../core/theme/app_theme.dart';
 import '../widgets/math_tile.dart';
 import '../widgets/ad_banner.dart';
 import '../providers/settings_provider.dart';
+import 'tutorial_screen.dart';
 import '../../core/utils/translations.dart';
 
 /// Pantalla principal del juego donde se muestra la cuadrícula y se interactúa con las piezas.
@@ -41,36 +44,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     });
   }
 
-  void _centerGrid() {
+  double _getGridSize(int gridSize, double screenWidth) {
+    final cellSize = screenWidth / (gridSize > 14 ? (gridSize > 22 ? 22 : 14) : 10);
+    final spacing = gridSize > 20 ? 1.0 : 2.0;
+    return (cellSize * gridSize) + (spacing * (gridSize - 1));
+  }
+
+  void _centerGrid([Size? availableSize]) {
     if (!mounted) return;
-    final size = MediaQuery.of(context).size;
-    const canvasWidth = 1500.0;
-    const canvasHeight = 1500.0;
-    final x = (canvasWidth - size.width) / 2;
-    final y = (canvasHeight - (size.height * 0.7)) / 2;
-    _transformationController.value = Matrix4.identity();
+    final gameState = ref.read(gameProvider);
+    if (gameState.currentLevel == null) return;
+
+    final screenSize = MediaQuery.of(context).size;
+    final viewSize = availableSize ?? screenSize;
+    final gridSize = gameState.currentLevel!.size;
+    final totalGridSize = _getGridSize(gridSize, screenSize.width);
     
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final size = MediaQuery.of(context).size;
-      
-      // Obtenemos el tamaño real del canvas desde el estado actual
-      final gameState = ref.read(gameProvider);
-      if (gameState.currentLevel == null) return;
-      
-      final gridSize = gameState.currentLevel!.size;
-      final double cellSize = gridSize > 14 ? (gridSize > 20 ? 28 : 38) : (gridSize > 10 ? 45 : 65);
-      final spacing = gridSize > 14 ? 1.0 : 2.0;
-      final totalGridSize = (cellSize * gridSize) + (spacing * (gridSize - 1)) + 40; // + padding
-      
-      final canvasWidth = max(totalGridSize * 2, size.width);
-      final canvasHeight = max(totalGridSize * 2, size.height);
+    // Calculamos el offset horizontal para que el centro de la grilla coincida con el centro de la pantalla
+    final x = (max(totalGridSize, viewSize.width) - viewSize.width) / 2;
+    // Siempre pegado arriba
+    final y = 0.0; 
 
-      final x = (canvasWidth - size.width) / 2;
-      final y = (canvasHeight - (size.height * 0.6)) / 2;
-
-      _transformationController.value = Matrix4.identity()..translate(-x, -y);
-    });
+    _transformationController.value = Matrix4.identity()..translate(-x, -y);
   }
 
   void _loadRewardedAd() {
@@ -93,7 +88,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  void _showAd() {
+  void _showRewardedAd() {
     if (_rewardedAd == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('El anuncio no está listo todavía, intenta en unos segundos')),
@@ -139,15 +134,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     // Escuchamos eventos especiales para diálogos
     ref.listen(gameProvider, (previous, next) {
       if (next.isLevelComplete && !(previous?.isLevelComplete ?? false)) {
-        _showWinDialog(context, ref, next, l10n);
+        // Ya se muestra el _buildVictoryOverlay en el Stack del body
       }
       if (next.isGameOver && !(previous?.isGameOver ?? false)) {
         _showGameOverDialog(context, ref, next, l10n);
       }
       
       if (next.levelNumber != previous?.levelNumber) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _centerGrid();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) _centerGrid();
         });
       }
 
@@ -158,15 +153,31 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       }
     });
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => TutorialScreen()));
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Theme.of(context).brightness == Brightness.light ? Brightness.dark : Brightness.light,
+          statusBarBrightness: Theme.of(context).brightness == Brightness.light ? Brightness.light : Brightness.dark,
+        ),
+        child: Scaffold(
+          body: Stack(
+            children: [
+              SafeArea(
+                bottom: false, // El inventario ya maneja su propio margen inferior
+                child: Column(
               children: [
                 _buildHeader(context, gameState, ref, l10n), // Barra superior con estadísticas.
                 Expanded(
-                  child: Center(child: _buildGrid(context, gameState, ref, l10n)), // El tablero de juego.
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: _buildGrid(context, gameState, ref, l10n),
+                  ), // El tablero de juego.
                 ),
                 _buildActionButtons(gameState, ref, l10n), // Botones de Deshacer y Pista
                 if (gameState.difficulty == 'hard') _buildMachine(gameState, l10n), // Nueva máquina de fusión
@@ -176,7 +187,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             ).animate(target: gameState.errorTrigger.toDouble()).shake(hz: 8, curve: Curves.easeInOut, offset: const Offset(4, 0)),
           ),
           // Superposición visual que se muestra al ganar el nivel.
-          if (gameState.isLevelComplete) _buildVictoryOverlay(l10n),
+          if (gameState.isLevelComplete) _buildVictoryOverlay(gameState, l10n),
           
           // Mensaje central animado (reemplaza SnackBar)
           if (gameState.message != null)
@@ -195,10 +206,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ),
               ).animate().scale(duration: 400.ms, curve: Curves.elasticOut).fadeOut(delay: 1.5.seconds),
             ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showTutorialDialog(BuildContext context, Translations l10n) {
     bool dontShowAgain = false;
@@ -284,85 +297,61 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   Widget _buildHeader(BuildContext context, GameState state, WidgetRef ref, Translations l10n) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final primaryColor = isLight ? Colors.black : Colors.white;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black26,
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+        color: isLight ? Colors.white.withOpacity(0.5) : Colors.black26,
+        border: Border(bottom: BorderSide(color: primaryColor.withOpacity(0.1))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Combo Badge (Solo si hay combo activo)
-          if (state.comboCount > 1)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Colors.orange, Colors.redAccent]),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.5), blurRadius: 10)],
+          Row(
+            children: [
+              _StatItem(
+                label: l10n.text('lives_label'),
+                value: '${state.lives}',
+                isWarning: state.lives < 2,
+                color: Colors.redAccent, 
+              ).animate(target: state.lifeLostTrigger.toDouble())
+               .shake(duration: 500.ms, hz: 10, offset: const Offset(5, 0))
+               .tint(color: Colors.red, duration: 200.ms).then().tint(color: Colors.transparent),
+              const SizedBox(width: 15),
+              _StatItem(
+                label: 'NIVEL',
+                value: state.isDailyChallenge ? 'DIA' : '${state.levelNumber}',
+                color: primaryColor,
               ),
-              child: Text(
-                'COMBO x${state.comboCount}',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+              const SizedBox(width: 15),
+              _StatItem(
+                label: 'PUNTOS',
+                value: '${state.score}',
+                color: primaryColor,
               ),
-            ).animate().scale(duration: 400.ms, curve: Curves.elasticOut).shimmer(duration: 1.seconds),
-          
-          _StatItem(
-            label: l10n.text('lives_label'),
-            value: '${state.lives}',
-            isWarning: state.lives < 2,
+            ],
           ),
           
-          // Nivel con botón de refresco integrado de forma elegante
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              children: [
-                _StatItem(label: l10n.text('level_label'), value: '${state.levelNumber}'),
-                const SizedBox(width: 8),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.refresh, size: 18, color: Colors.blueAccent),
-                  onPressed: () => ref.read(gameProvider.notifier).startNewLevel(state.levelNumber),
-                ),
-              ],
-            ),
-          ),
-
           Row(
             children: [
               _StatItem(
                 label: l10n.text('time_label'),
                 value: '${state.timeLeft}s',
-                isWarning: state.timeLeft < 15,
+                isWarning: state.isTimerCountDown && state.timeLeft < 15,
+                color: primaryColor,
               ),
               IconButton(
-                icon: Icon(state.isTimerPaused ? Icons.play_arrow : Icons.pause, color: Colors.blueAccent, size: 18),
+                icon: Icon(state.isTimerPaused ? Icons.play_arrow : Icons.pause, color: primaryColor, size: 20),
                 onPressed: () => ref.read(gameProvider.notifier).togglePause(),
               ),
             ],
           ),
 
-          _StatItem(
-            label: 'SCORE',
-            value: '${state.score}',
-          ).animate(target: state.score.toDouble()).scale(begin: const Offset(1,1), end: const Offset(1.2, 1.2), duration: 200.ms).then().scale(begin: const Offset(1.2, 1.2), end: const Offset(1, 1)),
-
-          // Selector de Tema
           IconButton(
-            icon: Icon(
-              ref.watch(settingsProvider).themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              size: 20,
-            ),
-            onPressed: () => ref.read(settingsProvider.notifier).toggleTheme(),
+            icon: Icon(Icons.settings, color: primaryColor),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
       ),
@@ -374,53 +363,53 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (state.currentLevel == null) return const CircularProgressIndicator();
 
     final size = state.currentLevel!.size;
-    // Tamaño de celda más generoso para que se vea bien
-    final double cellSize = size > 14 ? (size > 20 ? 28 : 38) : (size > 10 ? 45 : 65);
-    final spacing = size > 14 ? 1.0 : 2.0;
-    final totalGridSize = (cellSize * size) + (spacing * (size - 1));
     final screenSize = MediaQuery.of(context).size;
-    
-    // Canvas proporcional al tamaño de la grilla
-    final double canvasWidth = max(totalGridSize * 2, screenSize.width);
-    final double canvasHeight = max(totalGridSize * 2, screenSize.height);
+    final spacing = size > 20 ? 1.0 : 2.0;
+    final totalGridSize = _getGridSize(size, screenSize.width);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: InteractiveViewer(
-        transformationController: _transformationController,
-        boundaryMargin: const EdgeInsets.all(600),
-        minScale: 0.1,
-        maxScale: 2.5,
-        constrained: false, 
-        child: Container(
-          width: canvasWidth,
-          height: canvasHeight,
-          alignment: Alignment.center, // Centrado real
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewWidth = constraints.maxWidth;
+        final viewHeight = constraints.maxHeight;
+        final containerWidth = max(totalGridSize, viewWidth);
+        final containerHeight = max(totalGridSize, viewHeight);
+
+        return InteractiveViewer(
+          transformationController: _transformationController,
+          boundaryMargin: const EdgeInsets.fromLTRB(800, 0, 800, 1500),
+          minScale: 0.1,
+          maxScale: 4.0,
+          constrained: false,
           child: Container(
-            width: totalGridSize,
-            height: totalGridSize,
-            padding: const EdgeInsets.all(20),
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: size,
-                mainAxisSpacing: spacing,
-                crossAxisSpacing: spacing,
+            width: containerWidth,
+            height: containerHeight,
+            alignment: Alignment.topCenter,
+            color: Colors.transparent,
+            child: Container(
+              width: totalGridSize,
+              height: totalGridSize,
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: size,
+                  mainAxisSpacing: spacing,
+                  crossAxisSpacing: spacing,
+                ),
+                itemCount: size * size,
+                itemBuilder: (context, index) {
+                  final x = index % size;
+                  final y = index ~/ size;
+                  final cell = state.currentLevel!.cells.firstWhere(
+                    (c) => c.x == x && c.y == y,
+                    orElse: () => GridCell(x: x, y: y, type: CellType.empty),
+                  );
+                  return _buildCell(cell, state, ref, l10n);
+                },
               ),
-              itemCount: size * size,
-              itemBuilder: (context, index) {
-                final x = index % size;
-                final y = index ~/ size;
-                final cell = state.currentLevel!.cells.firstWhere(
-                  (c) => c.x == x && c.y == y,
-                  orElse: () => GridCell(x: x, y: y, type: CellType.empty),
-                );
-                 return _buildCell(cell, state, ref, l10n);
-              },
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -464,29 +453,35 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: isSolved
-                  ? Colors.green.withOpacity(0.4)
-                  : (cell.isFixed
-                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.15)
-                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.08)),
-              borderRadius: BorderRadius.circular(size > 12 ? 4 : 8),
+                  ? Colors.green.withOpacity(0.3)
+                  : (Theme.of(context).brightness == Brightness.light
+                      ? const Color(0xFFFFFDD0) // Cream
+                      : const Color(0xFF2D2D2D)), // Darker pastel
+              borderRadius: BorderRadius.circular(size > 12 ? 2 : 4),
               border: Border.all(
                 color: isSolved
                     ? Colors.greenAccent
-                    : (candidateData.isNotEmpty ? Colors.blueAccent : Theme.of(context).colorScheme.onSurface.withOpacity(0.2)),
-                width: isSolved ? 2.5 : 1.5,
+                    : (cell.isFixed
+                        ? Theme.of(context).colorScheme.primary.withOpacity(0.5)
+                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+                width: isSolved ? 2.0 : 1.0,
               ),
             ),
             child: Center(
               child: Text(
                 cell.currentValue ?? (cell.isFixed ? cell.value! : ''),
+                overflow: TextOverflow.visible,
+                softWrap: false,
                 style: TextStyle(
-                  fontSize: size > 25 ? 10 : (size > 20 ? 12 : (size > 12 ? 16 : 20)),
+                  fontSize: (size > 30 ? 6 : (size > 25 ? 8 : (size > 20 ? 10 : (size > 12 ? 14 : 18)))) 
+                    * ref.watch(settingsProvider).tileScale
+                    * ((cell.currentValue?.length ?? cell.value?.length ?? 0) > 2 ? 0.8 : 1.0),
                   fontWeight: FontWeight.bold,
-                color: isSolved
-                    ? Colors.white
-                    : (cell.isFixed 
-                        ? Theme.of(context).colorScheme.onSurface 
-                        : Colors.blueAccent),
+                  color: isSolved
+                      ? Colors.white
+                      : (cell.isFixed 
+                          ? Theme.of(context).colorScheme.onSurface 
+                          : Colors.blueAccent),
                 ),
               ),
             ),
@@ -503,49 +498,66 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     
     if (footerTiles.isEmpty && machineTiles.isEmpty && state.machineInputA == null && state.machineInputB == null) return const SizedBox.shrink();
 
+    final scrollbarLeft = ref.watch(settingsProvider).scrollbarOnLeft;
+
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
     return Container(
-      constraints: const BoxConstraints(maxHeight: 180), // Un poco más alto para los dos grupos
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      constraints: const BoxConstraints(maxHeight: 140), 
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 5),
       decoration: BoxDecoration(
-        color: Colors.black54,
+        color: isLight ? Colors.white.withOpacity(0.9) : Colors.black54,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1), width: 2)),
+        border: Border(top: BorderSide(color: isLight ? Colors.black12 : Colors.white.withOpacity(0.1), width: 2)),
       ),
-      child: SingleChildScrollView(
-        controller: _footerScrollController,
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (footerTiles.isNotEmpty) ...[
-                Text(l10n.text('numbers_label'), style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                _buildTileGrid(footerTiles, isMachine: false),
-                const SizedBox(height: 16),
-              ],
-              if (machineTiles.isNotEmpty) ...[
-                Text(l10n.text('ingredients_label'), style: const TextStyle(color: Colors.pinkAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                _buildTileGrid(machineTiles, isMachine: true),
-              ],
-            ],
+      child: Directionality(
+        textDirection: scrollbarLeft ? TextDirection.rtl : TextDirection.ltr,
+        child: RawScrollbar(
+          controller: _footerScrollController,
+          thumbColor: AppTheme.primaryBlue.withOpacity(0.5),
+          radius: const Radius.circular(20),
+          thickness: 6,
+          thumbVisibility: true,
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: SingleChildScrollView(
+              controller: _footerScrollController,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (footerTiles.isNotEmpty) ...[
+                    Text(l10n.text('numbers_label'), style: TextStyle(color: isLight ? Colors.black54 : Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    _buildTileGrid(footerTiles, isMachine: false),
+                    const SizedBox(height: 16),
+                  ],
+                  if (machineTiles.isNotEmpty) ...[
+                    Text(l10n.text('ingredients_label'), style: const TextStyle(color: Colors.pinkAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    _buildTileGrid(machineTiles, isMachine: true),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
+      ),
     ).animate().slideY(begin: 1, duration: 500.ms, curve: Curves.easeOutCubic);
   }
 
   Widget _buildTileGrid(List<String> tiles, {required bool isMachine}) {
     return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 6,
+      runSpacing: 6,
       children: tiles.map((value) {
         return Draggable<Map<String, dynamic>>(
           data: {'value': value, 'isMachine': isMachine},
-          feedback: MathTile(value: value, size: 50, color: isMachine ? Colors.pinkAccent : null),
+          feedback: MathTile(value: value, size: 40, color: isMachine ? Colors.pinkAccent : null),
           childWhenDragging: Opacity(
             opacity: 0.2,
-            child: MathTile(value: value, size: 45, color: isMachine ? Colors.pinkAccent : null),
+            child: MathTile(value: value, size: 35, color: isMachine ? Colors.pinkAccent : null),
           ),
-          child: MathTile(value: value, size: 45, color: isMachine ? Colors.pinkAccent : null),
+          child: MathTile(value: value, size: 35, color: isMachine ? Colors.pinkAccent : null),
         );
       }).toList(),
     );
@@ -730,10 +742,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  /// Overlay de celebración que aparece al completar un nivel.
-  Widget _buildVictoryOverlay(Translations l10n) {
+  Widget _buildVictoryOverlay(GameState state, Translations l10n) {
     return Container(
-      color: Colors.black.withOpacity(0.7),
+      color: Colors.black.withOpacity(0.85),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -741,26 +752,38 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             Stack(
               alignment: Alignment.center,
               children: [
-                const Icon(Icons.star, color: Colors.amber, size: 200)
+                // Estrellas de fondo girando
+                ...List.generate(5, (i) => 
+                  Icon(Icons.star, color: Colors.amber.withOpacity(0.3), size: 250 - (i * 30))
                     .animate(onPlay: (c) => c.repeat())
-                    .rotate(duration: 5.seconds)
-                    .scale(begin: const Offset(0.8, 0.8), end: const Offset(1.1, 1.1), duration: 2.seconds, curve: Curves.easeInOut),
-                const Icon(Icons.auto_awesome, color: Colors.white, size: 80)
+                    .rotate(duration: (5 + i).seconds)
+                    .scale(begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1), duration: 2.seconds, curve: Curves.easeInOut)
+                ),
+                
+                const Icon(Icons.emoji_events, color: Colors.amber, size: 120)
+                    .animate()
+                    .scale(duration: 600.ms, curve: Curves.elasticOut)
+                    .then()
                     .animate(onPlay: (c) => c.repeat())
-                    .scale(duration: 1.seconds, curve: Curves.bounceOut),
+                    .shimmer(duration: 2.seconds),
+                
+                const Icon(Icons.auto_awesome, color: Colors.white, size: 160)
+                    .animate(onPlay: (c) => c.repeat())
+                    .fadeOut(duration: 1.seconds)
+                    .scale(duration: 1.seconds, begin: const Offset(0.5, 0.5), end: const Offset(1.5, 1.5)),
               ],
             ),
             const SizedBox(height: 30),
             Text(
                   l10n.text('victory'),
-                  style: const TextStyle(
-                    fontSize: 55,
+                  style: GoogleFonts.roboto(
+                    fontSize: 60,
                     fontWeight: FontWeight.w900,
                     color: Colors.amber,
-                    letterSpacing: 8,
+                    letterSpacing: 4,
                     shadows: [
-                      Shadow(color: Colors.orange, blurRadius: 30),
-                      Shadow(color: Colors.white, blurRadius: 10),
+                      const Shadow(color: Colors.orange, blurRadius: 30, offset: Offset(4, 4)),
+                      const Shadow(color: Colors.white, blurRadius: 10),
                     ],
                   ),
                 )
@@ -768,78 +791,47 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 .scale(duration: 800.ms, curve: Curves.elasticOut)
                 .then()
                 .shimmer(duration: 1.5.seconds, color: Colors.white),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.timer_outlined, color: Colors.white, size: 28),
+                const SizedBox(width: 10),
+                Text(
+                  '${state.timeLeft}s',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 500.ms).scale(),
             const SizedBox(height: 40),
-            Text(
-              '${l10n.text('next_level_label') ?? 'Pasas al nivel'} ${ref.read(gameProvider).levelNumber + 1}...',
-              style: const TextStyle(color: Colors.white70, fontSize: 20, fontWeight: FontWeight.bold),
-            ).animate().fadeIn(delay: 1.seconds).slideY(begin: 0.5),
-            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
-                ref.read(gameProvider.notifier).startNewLevel(ref.read(gameProvider).levelNumber + 1);
+                ref.read(gameProvider.notifier).startNewLevel(state.levelNumber + 1);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber,
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                elevation: 10,
+                padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
+                elevation: 15,
+                shadowColor: Colors.amberAccent,
               ),
-              child: Text(
-                l10n.text('continue_button') ?? 'CONTINUAR',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+              child: const Text(
+                'SIGUIENTE',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 2),
               ),
-            ).animate().fadeIn(delay: 1.5.seconds).scale(curve: Curves.elasticOut),
+            ).animate().fadeIn(delay: 1.seconds).scale(curve: Curves.elasticOut),
           ],
         ),
       ),
     ).animate().fadeIn(duration: 400.ms);
   }
 
-  /// Muestra el diálogo de victoria con la puntuación y el botón para el siguiente nivel.
-  void _showWinDialog(BuildContext context, WidgetRef ref, GameState state, Translations l10n) {
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!context.mounted) return;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: Text(
-            l10n.text('victory'),
-            style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.military_tech, color: Colors.amber, size: 80),
-              const SizedBox(height: 20),
-              Text(
-                '${l10n.text('level_label')}: ${state.levelNumber}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Score: ${state.score}',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ref
-                    .read(gameProvider.notifier)
-                    .startNewLevel(state.levelNumber + 1);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
-              child: Text(l10n.text('next_level')),
-            ),
-          ],
-        ),
-      );
-    });
-  }
 
   /// Muestra el diálogo cuando el jugador pierde todas las vidas o se queda sin tiempo.
   void _showGameOverDialog(
@@ -848,29 +840,63 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     GameState state,
     Translations l10n,
   ) {
+    final bool isTimeUp = state.timeLeft <= 0;
+    
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.darkCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.redAccent, width: 2)),
         title: Text(
           l10n.text('game_over'),
-          style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 24),
         ),
-        content: Text(
-          l10n.text('try_again'),
-          style: const TextStyle(fontSize: 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isTimeUp ? Icons.timer_off : Icons.heart_broken, color: Colors.redAccent, size: 64),
+            const SizedBox(height: 20),
+            Text(
+              isTimeUp ? '¡Te quedaste sin tiempo!' : '¡Te quedaste sin vidas!',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '¿Quieres intentarlo de nuevo?',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+            ),
+          ],
         ),
         actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ref.read(gameProvider.notifier).startNewLevel(1);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-            child: Text(l10n.text('try_again')),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('SALIR', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ref.read(gameProvider.notifier).startNewLevel(1);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent, 
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: Text(l10n.text('try_again')),
+              ),
+            ],
           ),
+          const SizedBox(height: 10),
         ],
-      ),
+      ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
     );
   }
 
@@ -931,11 +957,13 @@ class _StatItem extends StatelessWidget {
   final String label;
   final String value;
   final bool isWarning;
+  final Color? color;
 
   const _StatItem({
     required this.label,
     required this.value,
     this.isWarning = false,
+    this.color,
   });
 
   @override
@@ -952,11 +980,11 @@ class _StatItem extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
             color: isWarning 
                 ? Colors.redAccent 
-                : Theme.of(context).colorScheme.onSurface,
+                : (color ?? Theme.of(context).colorScheme.onSurface),
           ),
         ),
       ],
@@ -967,63 +995,104 @@ class _StatItem extends StatelessWidget {
 extension GameScreenActions on _GameScreenState {
   Widget _buildActionButtons(GameState state, WidgetRef ref, Translations l10n) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Botón Deshacer (Solo Icono)
-          GestureDetector(
-            onTap: () => ref.read(gameProvider.notifier).undoMove(),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber, width: 1.5),
-              ),
-              child: const Icon(Icons.undo, color: Colors.amber, size: 22),
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Botón Deshacer
+            _ActionButton(
+              onTap: () => ref.read(gameProvider.notifier).undoMove(),
+              icon: Icons.undo,
+              color: Colors.amber,
             ),
-          ),
-          const SizedBox(width: 20),
-          // Botón Pista (Lamparita)
-          GestureDetector(
-            onTap: () {
-              if (state.hintsRemaining > 0) {
-                ref.read(gameProvider.notifier).useHint();
-              } else {
-                _showAd();
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: state.hintsRemaining > 0 ? Colors.blue.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent, 
-                  width: 1.5
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    state.hintsRemaining > 0 ? Icons.lightbulb : Icons.play_circle_fill,
-                    size: 20,
-                    color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    state.hintsRemaining > 0 ? '${state.hintsRemaining}' : l10n.text('hints_label'),
-                    style: TextStyle(
-                      color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent,
-                      fontWeight: FontWeight.bold
+            const SizedBox(width: 12),
+            // Botón Pista con opción de video si se agotan
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (state.hintsRemaining == 0)
+                  GestureDetector(
+                    onTap: _showRewardedAd,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.greenAccent.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.greenAccent, width: 1),
+                      ),
+                      child: const Icon(Icons.play_arrow, color: Colors.greenAccent, size: 16),
                     ),
-                  ),
-                ],
-              ),
+                  ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2), duration: 1.seconds, curve: Curves.easeInOut).shimmer(duration: 2.seconds),
+                _ActionButton(
+                  onTap: () => ref.read(gameProvider.notifier).useHint(),
+                  icon: Icons.lightbulb,
+                  label: 'HINT: ${state.hintsRemaining}',
+                  color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent,
+                ),
+              ],
             ),
-          ).animate(target: state.hintsRemaining == 0 ? 1 : 0).shake(hz: 4, curve: Curves.easeInOut),
-        ],
+            const SizedBox(width: 12),
+            // Combo Badge
+            if (state.comboCount > 1)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Colors.orange, Colors.redAccent]),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.3), blurRadius: 8)],
+                ),
+                child: Text(
+                  'x${state.comboCount}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+              ).animate().scale().shimmer(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final IconData icon;
+  final String? label;
+  final Color color;
+
+  const _ActionButton({
+    required this.onTap,
+    required this.icon,
+    this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color, width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 20),
+            if (label != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                label!,
+                style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

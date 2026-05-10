@@ -6,19 +6,36 @@ import '../../core/utils/translations.dart';
 class SettingsState {
   final ThemeMode themeMode;
   final Locale locale;
+  final double tileScale; // 0.8 para chico, 1.2 para grande
+  final String geography; // 'global', 'ue', 'usa'
+  final bool? consentAccepted; // null = pendiente, true = aceptado, false = rechazado
+  final bool scrollbarOnLeft;
 
   SettingsState({
     required this.themeMode,
     required this.locale,
+    this.tileScale = 1.0,
+    this.geography = 'global',
+    this.consentAccepted,
+    this.scrollbarOnLeft = false,
   });
 
   SettingsState copyWith({
     ThemeMode? themeMode,
     Locale? locale,
+    double? tileScale,
+    String? geography,
+    bool? consentAccepted,
+    bool? scrollbarOnLeft,
+    bool clearConsent = false,
   }) {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
       locale: locale ?? this.locale,
+      tileScale: tileScale ?? this.tileScale,
+      geography: geography ?? this.geography,
+      consentAccepted: clearConsent ? null : (consentAccepted ?? this.consentAccepted),
+      scrollbarOnLeft: scrollbarOnLeft ?? this.scrollbarOnLeft,
     );
   }
 }
@@ -39,6 +56,26 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
   void setLocale(Locale locale) {
     state = state.copyWith(locale: locale);
+  }
+
+  void setTileScale(double scale) {
+    state = state.copyWith(tileScale: scale);
+  }
+
+  void setGeography(String geo) {
+    state = state.copyWith(geography: geo);
+  }
+
+  void setConsent(bool accepted) {
+    state = state.copyWith(consentAccepted: accepted);
+  }
+
+  void resetConsent() {
+    state = state.copyWith(clearConsent: true);
+  }
+
+  void setScrollbarOnLeft(bool value) {
+    state = state.copyWith(scrollbarOnLeft: value);
   }
 }
 

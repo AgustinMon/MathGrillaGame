@@ -20,17 +20,17 @@ class AppTheme {
       surface: darkCard,
       error: neonRed,
     ),
-    textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
-      displayLarge: GoogleFonts.outfit(
+    textTheme: GoogleFonts.robotoTextTheme(ThemeData.dark().textTheme).copyWith(
+      displayLarge: GoogleFonts.roboto(
         fontSize: 32,
         fontWeight: FontWeight.bold,
         color: textWhite,
       ),
-      bodyLarge: GoogleFonts.outfit(
+      bodyLarge: GoogleFonts.roboto(
         fontSize: 18,
         color: textWhite,
       ),
-      labelLarge: GoogleFonts.outfit(
+      labelLarge: GoogleFonts.roboto(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: primaryBlue,
@@ -56,13 +56,13 @@ class AppTheme {
       error: Color(0xFFEF4444),
       onSurface: Color(0xFF1E293B),
     ),
-    textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme).copyWith(
-      displayLarge: GoogleFonts.outfit(
+    textTheme: GoogleFonts.robotoTextTheme(ThemeData.light().textTheme).copyWith(
+      displayLarge: GoogleFonts.roboto(
         fontSize: 32,
         fontWeight: FontWeight.bold,
         color: const Color(0xFF1E293B),
       ),
-      bodyLarge: GoogleFonts.outfit(
+      bodyLarge: GoogleFonts.roboto(
         fontSize: 18,
         color: const Color(0xFF334155),
       ),

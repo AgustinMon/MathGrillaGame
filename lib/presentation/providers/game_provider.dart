@@ -42,8 +42,10 @@ class GameState {
   final int comboCount;
   final DateTime? lastSolveTime;
   final int errorTrigger; // Incrementado para disparar sacudida de pantalla
+  final int lifeLostTrigger; // Incrementado para animar la pérdida de vida
   final Map<String, Map<String, dynamic>> fusedTilesData;
   final List<Map<String, dynamic>> moveHistory; // Historial para deshacer
+  final bool isTimerCountDown; // true para hard (baja), false para easy/medium (sube)
 
   GameState({
     this.currentLevel,
@@ -78,7 +80,9 @@ class GameState {
     this.comboCount = 0,
     this.lastSolveTime,
     this.errorTrigger = 0,
+    this.lifeLostTrigger = 0,
     this.moveHistory = const [],
+    this.isTimerCountDown = false,
   });
 
   /// Crea una copia del estado actual permitiendo modificar solo algunos campos.
@@ -117,8 +121,10 @@ class GameState {
     int? comboCount,
     DateTime? lastSolveTime,
     int? errorTrigger,
+    int? lifeLostTrigger,
     Map<String, Map<String, dynamic>>? fusedTilesData,
     List<Map<String, dynamic>>? moveHistory,
+    bool? isTimerCountDown,
   }) {
     return GameState(
       currentLevel: currentLevel ?? this.currentLevel,
@@ -153,9 +159,14 @@ class GameState {
       comboCount: comboCount ?? this.comboCount,
       lastSolveTime: lastSolveTime ?? this.lastSolveTime,
       errorTrigger: errorTrigger ?? this.errorTrigger,
+      lifeLostTrigger: lifeLostTrigger ?? this.lifeLostTrigger,
       moveHistory: moveHistory ?? this.moveHistory,
+      isTimerCountDown: isTimerCountDown ?? this.isTimerCountDown,
     );
   }
+
+  // Helper para saber si es el desafío diario
+  bool get isDailyChallenge => levelNumber != null && levelNumber! > 5000;
 }
 
 /// Maneja la lógica del negocio y las actualizaciones del estado del juego.
@@ -185,20 +196,29 @@ class GameNotifier extends StateNotifier<GameState> {
 
   /// Inicializa un nuevo nivel, reseteando temporizadores, vidas y el tablero.
   void startNewLevel(int level) {
-    final newLevel = MathEngine.generateLevel(level, difficulty: state.difficulty);
+    // Implementamos aleatorización: elegimos un nivel al azar de la lista disponible
+    final count = MathEngine.getLevelsCount(state.difficulty);
+    int selectedLevelId = level;
+    if (count > 0) {
+      selectedLevelId = Random().nextInt(count) + 1;
+    }
+    
+    final newLevel = MathEngine.generateLevel(selectedLevelId, difficulty: state.difficulty);
     
     // Tiempo dinámico: 60s base + 4s por cada celda que el usuario debe completar.
     int emptyCellsCount = newLevel.cells.where((c) => !c.isFixed).length;
     int calculatedTime = 60 + (emptyCellsCount * 4);
     
     // Multiplicadores de dificultad para mayor reto.
+    bool countDown = state.difficulty == 'hard';
     if (state.difficulty == 'medium') calculatedTime = (calculatedTime * 1.2).toInt();
     if (state.difficulty == 'hard') calculatedTime = (calculatedTime * 1.5).toInt();
 
     state = state.copyWith(
       currentLevel: newLevel,
       levelNumber: level,
-      timeLeft: calculatedTime,
+      timeLeft: countDown ? calculatedTime : 0, // Inicia en 0 si es progresivo
+      isTimerCountDown: countDown,
       isLevelComplete: false,
       isGameOver: false,
       lives: 3,
@@ -214,9 +234,23 @@ class GameNotifier extends StateNotifier<GameState> {
       machineTiles: newLevel.machineTiles,
       machineInputAFromMachine: false,
       machineInputBFromMachine: false,
+      comboCount: 0,
     );
     _startTimer();
     _checkWinCondition();
+  }
+
+  /// Inicia el desafío diario (un nivel fijo para el día actual).
+  void startDailyChallenge() {
+    final now = DateTime.now();
+    // Usamos la fecha como semilla para el ID del nivel
+    // Forzamos un ID alto (> 5000) para saltar los niveles pre-diseñados del JSON
+    // que contienen números excesivamente grandes.
+    final seed = now.year * 10000 + now.month * 100 + now.day;
+    final dailyId = 5001 + (seed % 1000); 
+    
+    startNewLevel(dailyId);
+    state = state.copyWith(message: '¡DESAFÍO DIARIO!');
   }
 
   void changeDifficulty(String newDifficulty) {
@@ -231,11 +265,16 @@ class GameNotifier extends StateNotifier<GameState> {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (state.isTimerPaused || state.isGameOver || state.isLevelComplete) return;
       
-      if (state.timeLeft > 0) {
-        state = state.copyWith(timeLeft: state.timeLeft - 1);
+      if (state.isTimerCountDown) {
+        if (state.timeLeft > 0) {
+          state = state.copyWith(timeLeft: state.timeLeft - 1);
+        } else {
+          _timer?.cancel();
+          state = state.copyWith(isGameOver: true);
+        }
       } else {
-        _timer?.cancel();
-        state = state.copyWith(isGameOver: true);
+        // Modo Easy/Medium: El tiempo sube
+        state = state.copyWith(timeLeft: state.timeLeft + 1);
       }
     });
   }
@@ -476,6 +515,7 @@ class GameNotifier extends StateNotifier<GameState> {
             lives: state.lives - 1,
             score: max(0, state.score - 50),
             errorTrigger: state.errorTrigger + 1,
+            lifeLostTrigger: state.lifeLostTrigger + 1,
             comboCount: 0, // Reset combo on error
             message: 'Algo no está bien...',
           );
@@ -586,6 +626,14 @@ class GameNotifier extends StateNotifier<GameState> {
     if (op == '*') return valA * valB == valRes;
     if (op == '/') return valB != 0 && valA / valB == valRes;
     return false;
+  }
+
+  /// Verifica que cada celda contenga exactamente el valor pensado para esa posición.
+  bool _isExactMatch(List<GridCell> cells) {
+    return cells.every((c) {
+      final current = c.currentValue ?? (c.isFixed ? c.value : null);
+      return current == c.value;
+    });
   }
 
   /// Helper para obtener una celda en coordenadas específicas, devolviendo una vacía si no existe.

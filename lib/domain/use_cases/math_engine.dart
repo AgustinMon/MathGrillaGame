@@ -14,16 +14,14 @@ class MathEngine {
 
   /// Carga los niveles pre-diseñados desde los archivos JSON de assets.
   static Future<void> loadLevels() async {
-    for (var diff in ['easy', 'medium', 'hard']) {
-      try {
-        final String jsonStr = await rootBundle.loadString('assets/levels_$diff.json');
-        final List<dynamic> jsonList = jsonDecode(jsonStr);
-        _levelsByDifficulty[diff] = jsonList.map((j) => PuzzleLevel.fromJson(j)).toList();
-        debugPrint('✅ CRUCIMATH: Cargados ${_levelsByDifficulty[diff]!.length} niveles para $diff.');
-      } catch (e) {
-        debugPrint('❌ CRUCIMATH: Error cargando niveles para $diff: $e');
-      }
-    }
+    // Desactivamos la carga de niveles fijos para evitar números gigantes heredados de assets antiguos.
+    _levelsByDifficulty = {'easy': [], 'medium': [], 'hard': []};
+    debugPrint('✅ CRUCIMATH: Niveles fijos desactivados. Todo será procedural y controlado.');
+  }
+
+  /// Retorna la cantidad de niveles disponibles para una dificultad.
+  static int getLevelsCount(String difficulty) {
+    return _levelsByDifficulty[difficulty]?.length ?? 0;
   }
 
   /// Genera o recupera un nivel según el [levelId] y la [difficulty].
@@ -40,14 +38,17 @@ class MathEngine {
     }
 
     // Fallback procedural con lógica escalada
-    int size = 7; // Mínimo 7 para permitir cruces decentes
-    if (levelId >= 20) {
-      size = 18;
-    } else if (levelId >= 10) {
-      size = 12;
-    } else if (levelId >= 5) {
-      size = 9;
+    int size = 7; 
+    if (difficulty == 'medium') size = 13; // Más grande para permitir más cruces
+    if (difficulty == 'hard') size = 18;
+
+    if (levelId >= 15) {
+      size = (size * 1.4).toInt();
+    } else if (levelId >= 8) {
+      size = (size * 1.2).toInt();
     }
+    size = size.clamp(7, 35);
+    size = size.clamp(7, 30);
 
     // Intentamos generar un nivel con la densidad deseada.
     // Solo permitimos intersecciones para garantizar que todo esté conectado.
@@ -56,14 +57,28 @@ class MathEngine {
       List<String> footerTiles = [];
       List<String> allowedOps = ['+', '-'];
       
+      if (difficulty == 'medium') {
+        allowedOps.add('*');
+        if (levelId >= 3) allowedOps.add('/');
+      } else if (difficulty == 'hard') {
+        allowedOps.addAll(['*', '/']);
+      } else {
+        if (levelId >= 3) allowedOps.add('*');
+        if (levelId >= 10) allowedOps.add('/');
+      }
+
+      // 1. Añadimos la primera operación en el centro
+      _addOperation(cells, size ~/ 2 - 2, size ~/ 2, true, footerTiles, allowedOps, size, levelId, difficulty);
+
       if (levelId >= 3) allowedOps.add('*');
       if (levelId >= 10) allowedOps.add('/');
 
-      // 1. Colocamos la primera operación central.
-      _addOperation(cells, 0, _random.nextInt(size - 4), true, footerTiles, allowedOps, size, levelId);
-
-      // 2. Añadimos el resto de operaciones asegurando que se crucen.
-      int targetOps = 3 + (levelId ~/ 2).clamp(0, 10);
+      // 2. Calculamos el objetivo de operaciones según dificultad
+      int targetOps = 3;
+      if (difficulty == 'medium') targetOps = 8 + (levelId ~/ 3);
+      if (difficulty == 'hard') targetOps = 15 + (levelId ~/ 2);
+      targetOps = targetOps.clamp(3, 30);
+      
       int successfulOps = 1;
 
       for (int o = 0; o < targetOps * 2 && successfulOps < targetOps; o++) {
@@ -73,7 +88,7 @@ class MathEngine {
           // Cruzamos la orientación de la celda objetivo
           _addIntersectingOperation(
             cells, target.x, target.y, !target.isHorizontal, footerTiles, allowedOps, 
-            target.value!, size, levelId,
+            target.value!, size, levelId, difficulty,
           );
           if (cells.length > oldLen) {
             successfulOps++;
@@ -82,8 +97,8 @@ class MathEngine {
         }
       }
 
-      // Si el nivel tiene al menos 2 o 3 operaciones, lo aceptamos.
-      if (successfulOps >= (levelId < 5 ? 2 : 3)) {
+      // Si el nivel tiene al menos el 70% de las operaciones deseadas, lo aceptamos.
+      if (successfulOps >= (targetOps * 0.7).toInt().clamp(2, 20)) {
         footerTiles.shuffle();
         
         final baseLevel = PuzzleLevel(
@@ -103,7 +118,19 @@ class MathEngine {
 
     // Si fallan todos los intentos de cruce, generamos un nivel con dos operaciones paralelas
     // para asegurar que al menos haya algo de juego.
-    return _generateRobustSimpleLevel(levelId, size);
+    return _generateRobustSimpleLevel(levelId, size, difficulty);
+  }
+
+  static PuzzleLevel _generateRobustSimpleLevel(int levelId, int size, String difficulty) {
+    List<GridCell> cells = [];
+    List<String> footerTiles = [];
+    List<String> allowedOps = ['+', '-'];
+    if (levelId >= 3) allowedOps.add('*');
+    
+    _addOperation(cells, 1, 1, true, footerTiles, allowedOps, size, levelId, difficulty);
+    _addOperation(cells, 1, 3, true, footerTiles, allowedOps, size, levelId, difficulty);
+    
+    return PuzzleLevel(id: levelId, size: size, cells: cells, footerTiles: footerTiles);
   }
 
   /// Añade una operación matemática simple (a op b = res) a la lista de celdas.
@@ -116,6 +143,7 @@ class MathEngine {
     List<String> allowedOps,
     int size,
     int levelId,
+    String difficulty,
   ) {
     var opData = _generateValidOp(allowedOps, levelId);
     List<String> parts = [
@@ -129,10 +157,34 @@ class MathEngine {
     // Verificamos si la operación completa cabe dentro de los límites del tablero.
     if (!_fits(startX, startY, horizontal, parts.length, size)) return;
 
+    // Decidimos qué números serán fijos ANTES de crear las celdas para asegurar que al menos uno vaya al footer.
+    List<int> numberIndices = [0, 2, 4];
+    List<int> fixedIndices = [];
+    double fixedProb = (difficulty == 'easy') ? 0.3 : (difficulty == 'medium' ? 0.2 : 0.1);
+    
+    for (int idx in numberIndices) {
+      if (_random.nextDouble() < fixedProb) {
+        fixedIndices.add(idx);
+      }
+    }
+    
+    // Regla de Oro: Nunca fijar los 3 números de una ecuación.
+    // En Medium/Hard, máximo 1 número fijo por ecuación nueva.
+    int maxFixed = (difficulty == 'easy') ? 2 : 1;
+    while (fixedIndices.length > maxFixed) {
+      fixedIndices.removeAt(_random.nextInt(fixedIndices.length));
+    }
+    // Asegurar al menos uno NO fijo siempre
+    if (fixedIndices.length >= 3) fixedIndices.removeAt(0);
+
     for (int i = 0; i < parts.length; i++) {
       int x = horizontal ? startX + i : startX;
       int y = horizontal ? startY : startY + i;
-      _createAndAddCell(cells, x, y, parts[i], footer, levelId, horizontal);
+      bool forceFixed = fixedIndices.contains(i);
+      bool forceFooter = numberIndices.contains(i) && !fixedIndices.contains(i);
+      
+      _createAndAddCell(cells, x, y, parts[i], footer, levelId, horizontal, difficulty, 
+          forceFixed: forceFixed, forceFooter: forceFooter);
     }
   }
 
@@ -147,6 +199,7 @@ class MathEngine {
     String targetValue,
     int size,
     int levelId,
+    String difficulty,
   ) {
     int tVal = int.tryParse(targetValue) ?? 0;
     
@@ -188,12 +241,39 @@ class MathEngine {
       if (conflict) continue;
 
       // Si llegamos aquí, la posición es válida. Añadimos y terminamos.
+      // Decidimos qué números adicionales (los que no son la intersección) serán fijos.
+      List<int> numberIndices = [0, 2, 4];
+      int intersectIdx = (pos == 0) ? 0 : (pos == 1 ? 2 : 4);
+      List<int> otherIndices = numberIndices.where((idx) => idx != intersectIdx).toList();
+      
+      List<int> fixedIndices = [];
+      // La intersección ya tiene su estado (fijo o no), así que solo decidimos para los otros 2.
+      double fixedProb = (difficulty == 'easy') ? 0.25 : (difficulty == 'medium' ? 0.15 : 0.05);
+      
+      for (int idx in otherIndices) {
+        if (_random.nextDouble() < fixedProb) fixedIndices.add(idx);
+      }
+
+      // Verificamos si la intersección ya es fija
+      var existingIntersect = cells.firstWhere((c) => c.x == intersectX && c.y == intersectY);
+      int totalFixedInEq = fixedIndices.length + (existingIntersect.isFixed ? 1 : 0);
+      
+      // Aplicamos límites de dificultad
+      int maxFixed = (difficulty == 'easy') ? 2 : 1;
+      while (totalFixedInEq > maxFixed && fixedIndices.isNotEmpty) {
+        fixedIndices.removeAt(0);
+        totalFixedInEq--;
+      }
+
       for (int i = 0; i < parts.length; i++) {
         int x = horizontal ? adjustedStartX + i : adjustedStartX;
         int y = horizontal ? adjustedStartY : adjustedStartY + i;
         var existing = cells.where((c) => c.x == x && c.y == y).toList();
         if (existing.isEmpty) {
-          _createAndAddCell(cells, x, y, parts[i], footer, levelId, horizontal);
+          bool forceFixed = fixedIndices.contains(i);
+          bool forceFooter = numberIndices.contains(i) && !fixedIndices.contains(i);
+          _createAndAddCell(cells, x, y, parts[i], footer, levelId, horizontal, difficulty,
+              forceFixed: forceFixed, forceFooter: forceFooter);
         }
       }
       return; // Operación añadida con éxito
@@ -202,34 +282,41 @@ class MathEngine {
 
   /// Genera una op que contiene el valor [t] en la posición [pos].
   static _OpData? _generateOpWithTarget(List<String> ops, int t, int pos, int levelId) {
-    int maxNum = 20 + (levelId * 5);
+    int maxNum = (20 + (levelId * 2)).clamp(10, 100);
     String op = ops[_random.nextInt(ops.length)];
     int a = 0, b = 0, res = 0;
 
-    if (pos == 0) { // Target es 'a'
-      a = t; b = _random.nextInt(maxNum) + 1;
-      if (op == '/') { b = _random.nextInt(9) + 2; a = (a ~/ b) * b; if (a == 0) return null; }
-    } else if (pos == 1) { // Target es 'b'
-      b = t; a = _random.nextInt(maxNum) + 1;
-      if (op == '/') { a = b * (_random.nextInt(10) + 1); }
-      if (op == '-' && a < b) a = b + _random.nextInt(maxNum);
-    } else { // Target es 'res'
-      res = t;
-      if (op == '+') { a = _random.nextInt(res.clamp(1, 1000)); b = res - a; }
-      else if (op == '-') { b = _random.nextInt(maxNum); a = res + b; }
-      else if (op == '*') { 
-        var factors = []; for(int i=1; i<=res; i++) if(res%i==0) factors.add(i);
-        if (factors.isEmpty) return null; a = factors[_random.nextInt(factors.length)]; b = res ~/ a;
-      } else { b = _random.nextInt(10) + 1; a = res * b; }
-      return _OpData(a, op, b, res);
-    }
+    for (int retry = 0; retry < 50; retry++) {
+      if (pos == 0) { // Target es 'a'
+        a = t; b = _random.nextInt(maxNum) + 1;
+        if (op == '/') { b = (_random.nextInt(9) + 2).clamp(2, a > 0 ? a : 10); a = (a ~/ b) * b; }
+      } else if (pos == 1) { // Target es 'b'
+        b = t; a = _random.nextInt(maxNum) + 1;
+        if (op == '/') { a = b * (_random.nextInt(10) + 1); }
+        if (op == '-' && a < b) a = b + _random.nextInt(maxNum);
+      } else { // Target es 'res'
+        res = t;
+        if (op == '+') { a = _random.nextInt(res.clamp(1, 1000)); b = res - a; }
+        else if (op == '-') { b = _random.nextInt(maxNum); a = res + b; }
+        else if (op == '*') { 
+          var factors = []; for(int i=1; i<=res; i++) if(res%i==0) factors.add(i);
+          if (factors.isEmpty) return null; a = factors[_random.nextInt(factors.length)]; b = res ~/ a;
+        } else { b = (_random.nextInt(10) + 1); a = res * b; }
+      }
 
-    if (op == '+') res = a + b; 
-    if (op == '-') res = a - b; 
-    if (op == '*') res = a * b; 
-    if (op == '/') { if (b == 0) b = 1; res = a ~/ b; }
-    
-    return _OpData(a, op, b, res);
+      if (op == '+') res = a + b; 
+      if (op == '-') res = a - b; 
+      if (op == '*') res = a * b; 
+      if (op == '/') { if (b == 0) b = 1; res = a ~/ b; }
+      
+      // Validar límites de 3 cifras (999) y lógica
+      if (res >= 0 && res <= 999 && a >= 0 && a <= 999 && b >= 0 && b <= 999) {
+        // Para multiplicación, evitar que ambos sean grandes para mantenerlo mentalmente factible
+        if (op == '*' && (a > 50 || b > 50)) continue;
+        return _OpData(a, op, b, res);
+      }
+    }
+    return null;
   }
 
   /// Comprueba si una secuencia de celdas cabe en el tablero actual.
@@ -250,17 +337,33 @@ class MathEngine {
     List<String> footer,
     int levelId,
     bool isHorizontal,
-  ) {
+    String difficulty, {
+    bool? forceFixed,
+    bool? forceFooter,
+  }) {
     CellType type = _getCellType(val);
+    
+    // FILTRO DE SEGURIDAD ABSOLUTO: Si por algún motivo llega un número > 999, abortamos la celda.
+    if (type == CellType.number) {
+      int? numVal = int.tryParse(val);
+      if (numVal != null && (numVal > 999 || numVal < 0)) return;
+    }
+
     bool shouldBeFixed = false;
 
     // Los operadores (+, -, =, etc) siempre son fijos y visibles.
     if (type == CellType.operator || type == CellType.equals) {
       shouldBeFixed = true;
     } else {
-      // La probabilidad de dar pistas (números fijos) disminuye con el nivel.
-      double fixedProb = 0.3 / (1 + (levelId / 10));
-      if (_random.nextDouble() < fixedProb) shouldBeFixed = true;
+      if (forceFixed == true) {
+        shouldBeFixed = true;
+      } else if (forceFooter == true) {
+        shouldBeFixed = false;
+      } else {
+        // Fallback (solo para celdas que no pasaron por la lógica de ecuación, si las hay)
+        double fixedProb = (difficulty == 'easy') ? 0.2 : 0.1;
+        shouldBeFixed = _random.nextDouble() < fixedProb;
+      }
     }
 
     // Si el número no es fijo, se añade a la lista de piezas que el jugador debe colocar.
@@ -282,38 +385,33 @@ class MathEngine {
   /// Genera una operación matemática válida aleatoria.
   /// La dificultad escala con el [levelId].
   static _OpData _generateValidOp(List<String> ops, int levelId) {
-    // Aumentamos el rango de los números según el nivel.
-    int maxNum = 10 + (levelId * 3);
-    if (maxNum > 200) maxNum = 200; // Cap de dificultad razonable.
-
-    for (int i = 0; i < 100; i++) {
+    int maxNum = (10 + (levelId * 2)).clamp(10, 100);
+    
+    while (true) {
       String op = ops[_random.nextInt(ops.length)];
-      int a = _random.nextInt(maxNum) + 2;
-      int b = _random.nextInt(maxNum) + 2;
-
-      if (op == '-' && a < b) { int t = a; a = b; b = t; }
-      if (op == '/' ) {
-        int res = _random.nextInt(maxNum ~/ 5 + 5) + 1;
-        b = _random.nextInt(12) + 2; 
-        a = res * b;
-      }
-      
-      if (op == '*' && (a == 1 || b == 1)) continue;
-
+      int a = _random.nextInt(maxNum) + 1;
+      int b = _random.nextInt(maxNum) + 1;
       int res = 0;
+
       if (op == '+') res = a + b;
-      if (op == '-') res = a - b;
-      if (op == '*') res = a * b;
-      if (op == '/') res = a ~/ b;
+      if (op == '-') { if (a < b) { int temp = a; a = b; b = temp; } res = a - b; }
+      if (op == '*') { 
+        // Para multiplicación, limitar para que sea mentalmente posible y < 1000
+        a = _random.nextInt(30) + 2;
+        b = _random.nextInt(15) + 2;
+        res = a * b; 
+      }
+      if (op == '/') {
+        b = _random.nextInt(12) + 2;
+        a = b * (_random.nextInt(15) + 1);
+        res = a ~/ b;
+      }
 
-      // Filtramos resultados demasiado grandes o negativos.
-      if (res < 0 || res > 500) continue;
-      // Evitamos resultados demasiado simples en niveles altos.
-      if (levelId > 10 && res < 10 && _random.nextDouble() < 0.8) continue;
-
-      return _OpData(a, op, b, res);
+      if (res >= 0 && res <= 999 && a >= 0 && a <= 999 && b >= 0 && b <= 999) {
+        if (op == '*' && (a > 50 || b > 50)) continue;
+        return _OpData(a, op, b, res);
+      }
     }
-    return _OpData(10, '+', 10, 20); 
   }
 
   /// Genera una operación matemática que contenga un número específico (target).
@@ -324,8 +422,7 @@ class MathEngine {
     bool targetIsA,
     int levelId,
   ) {
-    int maxNum = 20 + (levelId * 4);
-    if (maxNum > 300) maxNum = 300;
+    int maxNum = (20 + (levelId * 4)).clamp(10, 100);
 
     List<String> shuffledOps = List.from(ops)..shuffle();
     for (var op in shuffledOps) {
@@ -351,7 +448,7 @@ class MathEngine {
         if (op == '*') res = a * b;
         if (op == '/') res = a ~/ b;
 
-        if (res < 0 || res > 500) continue;
+        if (res < 0 || res > 999) continue;
         if (res == target) continue;
         // Evitamos redundancia en niveles altos.
         if (levelId > 20 && (a < 5 || b < 5) && (op == '+' || op == '-')) continue;
@@ -360,21 +457,6 @@ class MathEngine {
       }
     }
     return null;
-  }
-
-  static PuzzleLevel _generateRobustSimpleLevel(int levelId, int size) {
-    List<GridCell> cells = [];
-    List<String> footer = [];
-    _addOperation(cells, 0, 1, true, footer, ['+', '-'], size, levelId);
-    _addOperation(cells, 0, 3, true, footer, ['+', '-'], size, levelId);
-    return PuzzleLevel(id: levelId, size: size, cells: cells, footerTiles: footer);
-  }
-
-  static PuzzleLevel _generateSimpleLevel(int id, int size) {
-     List<GridCell> cells = [];
-     List<String> footer = [];
-     _addOperation(cells, 0, 2, true, footer, ['+', '-'], size, id);
-     return PuzzleLevel(id: id, size: size, cells: cells, footerTiles: footer);
   }
 
   static PuzzleLevel _applyHardModeSplitting(PuzzleLevel level) {
