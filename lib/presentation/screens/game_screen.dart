@@ -56,7 +56,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   void _loadRewardedAd() {
     if (kIsWeb) return;
     RewardedAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/5224354917', // Test ID para recompensado
+      adUnitId: 'ca-app-pub-0815276588564171/1931750100', // Production ID
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
@@ -169,9 +169,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     child: _buildGrid(context, gameState, ref, l10n),
                   ),
                 ),
-                _buildFooter(gameState, l10n),
-                _buildActionButtons(gameState, ref, l10n),
-                if (gameState.difficulty == 'hard') _buildMachine(gameState, l10n),
+                _buildFooter(gameState, ref, l10n),
                 const AdBanner(), 
               ],
             ).animate(target: gameState.errorTrigger.toDouble()).shake(hz: 8, curve: Curves.easeInOut, offset: const Offset(4, 0)),
@@ -341,7 +339,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'NIVEL ${state.levelNumber}',
+                    '${l10n.text('${state.difficulty}_mode')} ${state.levelNumber}',
                     style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ],
@@ -506,7 +504,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  Widget _buildFooter(GameState state, Translations l10n) {
+  Widget _buildFooter(GameState state, WidgetRef ref, Translations l10n) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final footerTiles = List<String>.from(state.currentLevel?.footerTiles ?? [])..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
     final machineTiles = List<String>.from(state.machineTiles)..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
@@ -552,22 +550,67 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ),
               ),
             ),
-            AnimatedContainer(
+            AnimatedSize(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-              constraints: BoxConstraints(maxHeight: _isInventoryCollapsed ? 100 : 350),
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    if (footerTiles.isNotEmpty) _buildTileGrid(footerTiles, isMachine: false),
-                    if (machineTiles.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _buildTileGrid(machineTiles, isMachine: true),
-                    ],
-                  ],
-                ),
-              ),
+              alignment: Alignment.topCenter,
+              child: _isInventoryCollapsed 
+                ? const SizedBox(width: double.infinity)
+                : Container(
+                    constraints: const BoxConstraints(maxHeight: 350),
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          if (footerTiles.isNotEmpty) _buildTileGrid(footerTiles, isMachine: false),
+                          if (machineTiles.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildTileGrid(machineTiles, isMachine: true),
+                          ],
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _ActionButton(
+                                onTap: () => ref.read(gameProvider.notifier).undoMove(),
+                                icon: Icons.undo,
+                                color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade800,
+                              ),
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  _ActionButton(
+                                    onTap: () => ref.read(gameProvider.notifier).useHint(),
+                                    icon: Icons.lightbulb,
+                                    color: Colors.amber.shade700,
+                                    isFilled: true,
+                                    badgeNumber: state.hintsRemaining,
+                                  ),
+                                  if (state.hintsRemaining == 0)
+                                    Positioned(
+                                      right: -5,
+                                      top: -5,
+                                      child: GestureDetector(
+                                        onTap: _showRewardedAd,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blueAccent,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 1.5),
+                                          ),
+                                          child: const Icon(Icons.play_arrow, color: Colors.white, size: 12),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
             ),
           ],
         ),
@@ -1026,56 +1069,6 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-extension GameScreenActions on _GameScreenState {
-  Widget _buildActionButtons(GameState state, WidgetRef ref, Translations l10n) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = isDark ? Colors.indigo.shade200 : Colors.indigo.shade800;
-
-    return Container(
-      color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _ActionButton(
-            onTap: () => ref.read(gameProvider.notifier).undoMove(),
-            icon: Icons.undo,
-            color: iconColor,
-          ),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              _ActionButton(
-                onTap: () => ref.read(gameProvider.notifier).useHint(),
-                icon: Icons.lightbulb,
-                color: Colors.amber.shade700,
-                isFilled: true,
-                badgeNumber: state.hintsRemaining,
-              ),
-              if (state.hintsRemaining == 0)
-                Positioned(
-                  right: -5,
-                  top: -5,
-                  child: GestureDetector(
-                    onTap: _showRewardedAd,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.blueAccent,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                      child: const Icon(Icons.play_arrow, color: Colors.white, size: 12),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ActionButton extends StatelessWidget {
   final VoidCallback onTap;

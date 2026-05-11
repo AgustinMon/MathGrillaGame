@@ -628,6 +628,10 @@ class GameNotifier extends StateNotifier<GameState> {
             timeLeft: state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
           );
         }
+        
+        // Sumar puntos inmediatamente a las estadísticas del jugador
+        StatsRepository().addScore(points);
+
         HapticFeedback.mediumImpact();
         SoundService.playSuccess();
       } else {
@@ -716,10 +720,32 @@ class GameNotifier extends StateNotifier<GameState> {
       _timer?.cancel();
       SoundService.playWin();
       _checkMedals();
-      final finalScore = state.score + (state.levelNumber * 50) + (state.timeLeft * 2);
-      StatsRepository().incrementGamesWon();
-      StatsRepository().addScore(finalScore);
       
+      final levelBonus = state.levelNumber * 50;
+      final timeBonus = state.timeLeft * 2;
+      final extraScore = levelBonus + timeBonus;
+      final finalScore = state.score + extraScore;
+      
+      StatsRepository().incrementGamesWon();
+      // Solo guardamos los bonos extra al finalizar porque los puntos base ya se guardaron en _checkOperation
+      StatsRepository().addScore(extraScore);
+      
+      // Registrar métricas de la partida
+      int timeTaken = 0;
+      if (state.isTimerCountDown) {
+        int emptyCellsCount = state.currentLevel!.cells.where((c) => !c.isFixed).length;
+        int calculatedTime = 60 + (emptyCellsCount * 4);
+        if (state.difficulty == 'medium') calculatedTime = (calculatedTime * 1.2).toInt();
+        if (state.difficulty == 'hard') calculatedTime = (calculatedTime * 1.5).toInt();
+        timeTaken = calculatedTime - state.timeLeft;
+      } else {
+        timeTaken = state.timeLeft; // En modo progresivo el timeLeft representa el tiempo transcurrido
+      }
+      if (timeTaken < 0) timeTaken = 0;
+      
+      int eqCount = state.currentLevel!.cells.where((c) => c.type == CellType.equals).length;
+      StatsRepository().saveGameCompletionMetrics(timeTaken, eqCount, DateTime.now().hour);
+
       state = state.copyWith(
         isLevelComplete: true,
         score: finalScore,

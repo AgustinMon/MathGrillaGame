@@ -1,32 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../providers/settings_provider.dart';
+import '../../core/utils/translations.dart';
 import '../widgets/math_tile.dart';
 import '../../domain/entities/puzzle_level.dart';
 
-class ExplainMeScreen extends StatefulWidget {
+class ExplainMeScreen extends ConsumerStatefulWidget {
   const ExplainMeScreen({super.key});
 
   @override
-  State<ExplainMeScreen> createState() => _ExplainMeScreenState();
+  ConsumerState<ExplainMeScreen> createState() => _ExplainMeScreenState();
 }
 
-class _ExplainMeScreenState extends State<ExplainMeScreen> {
+class _ExplainMeScreenState extends ConsumerState<ExplainMeScreen> {
   int step = 0;
   
-  final List<String> explanations = [
-    "¡Bienvenido al modo 'Explícame'! Vamos a aprender cómo deducir las piezas.",
-    "Mira esta fila: '_ + 4 = 5'. ¿Qué número sumado a 4 da 5?",
-    "¡Exacto! Es el 1. Colocamos el 1 aquí.",
-    "Ahora mira esta columna que cruza el 1: '1 * _ = 3'.",
-    "Si tenemos 1 y el resultado es 3, el número debe ser 3. 1 * 3 = 3.",
-    "Al cruzar ecuaciones, los números deben servir para ambas. ¡Esa es la clave!",
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = ref.watch(translationsProvider);
+    
+    final List<String> explanations = [
+      l10n.text('explanation_0'),
+      l10n.text('explanation_1'),
+      l10n.text('explanation_2'),
+      l10n.text('explanation_3'),
+      l10n.text('explanation_4'),
+      l10n.text('explanation_5'),
+    ];
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Modo Explícame')),
+      appBar: AppBar(title: Text(l10n.text('explain_me_title'))),
       body: Column(
         children: [
           Expanded(
@@ -37,7 +41,7 @@ class _ExplainMeScreenState extends State<ExplainMeScreen> {
               ],
             ),
           ),
-          _buildExplanatoryModal(),
+          _buildExplanatoryModal(l10n, explanations),
         ],
       ),
     );
@@ -126,20 +130,24 @@ class _ExplainMeScreenState extends State<ExplainMeScreen> {
     return Container();
   }
 
-  Widget _buildExplanatoryModal() {
+  Widget _buildExplanatoryModal(Translations l10n, List<String> explanations) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: bgColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             explanations[step],
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: textColor),
             textAlign: TextAlign.center,
           ).animate(key: ValueKey(step)).fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 24),
@@ -153,7 +161,7 @@ class _ExplainMeScreenState extends State<ExplainMeScreen> {
                 }
               });
             },
-            child: Text(step < explanations.length - 1 ? 'Siguiente' : '¡Entendido!'),
+            child: Text(step < explanations.length - 1 ? l10n.text('next_button') : l10n.text('understood_button')),
           ),
         ],
       ),

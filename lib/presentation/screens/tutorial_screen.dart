@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../domain/entities/puzzle_level.dart';
 import '../providers/game_provider.dart';
 import '../providers/settings_provider.dart';
+import '../../core/utils/translations.dart';
 import 'game_screen.dart';
 import 'settings_screen.dart';
 import 'medals_screen.dart';
@@ -40,6 +41,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
   }
 
   void _showConsentDialog() {
+    final l10n = ref.read(translationsProvider);
     final settings = ref.read(settingsProvider);
     final isUE = settings.geography == 'ue';
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -51,13 +53,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          isUE ? 'Privacidad' : 'Privacy',
+          l10n.text('privacy_title'),
           style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold),
         ),
         content: Text(
-          isUE 
-            ? 'Necesitamos tu consentimiento para mejorar la experiencia.' 
-            : 'We need your consent to improve the experience.',
+          l10n.text('privacy_content'),
           style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
         ),
         actions: [
@@ -66,7 +66,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
               ref.read(settingsProvider.notifier).setConsent(false);
               Navigator.pop(context);
             },
-            child: const Text('RECHAZAR', style: TextStyle(color: Colors.grey)),
+            child: Text(l10n.text('reject'), style: const TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -74,7 +74,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, elevation: 0),
-            child: const Text('ACEPTAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(l10n.text('accept'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -83,6 +83,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = ref.watch(translationsProvider);
     final difficulty = ref.watch(gameProvider).difficulty;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = isDark ? Colors.white : const Color(0xFF0F172A);
@@ -142,31 +143,14 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   // Logo / Título
                   Column(
                     children: [
-                      RichText(
-                        text: TextSpan(
-                          style: GoogleFonts.outfit(
-                            fontSize: 52,
-                            letterSpacing: -1.5,
-                            color: primaryColor,
-                          ),
-                          children: [
-                            const TextSpan(
-                              text: 'Cruci ',
-                              style: TextStyle(fontWeight: FontWeight.w400),
-                            ),
-                            TextSpan(
-                              text: 'MATH',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                color: Colors.amber.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
+                      Image.asset(
+                        'assets/images/title_logo.png',
+                        height: 100,
+                        fit: BoxFit.contain,
                       ).animate().fadeIn(duration: 800.ms).scale(begin: const Offset(0.95, 0.95)),
                       const SizedBox(height: 8),
                       Text(
-                        'DESAFÍA TU MENTE',
+                        l10n.text('challenge_your_mind'),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -180,18 +164,18 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   const Spacer(flex: 1),
 
                   // Selector de Dificultad
-                  _buildThemedDifficultySelector(difficulty, isDark, cardBg),
+                  _buildThemedDifficultySelector(difficulty, isDark, cardBg, l10n),
 
                   const SizedBox(height: 40),
 
                   // Botón PLAY
-                  _buildPremiumPlayButton(context),
+                  _buildPremiumPlayButton(context, l10n),
 
                   const SizedBox(height: 24),
 
                   // Acciones secundarias
                   _buildThemedCardAction(
-                    'JUEGO DEL DÍA', 
+                    l10n.text('game_of_the_day'), 
                     Icons.calendar_today_rounded, 
                     const Color(0xFFF59E0B), 
                     cardBg,
@@ -205,12 +189,12 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   const SizedBox(height: 12),
 
                   _buildThemedCardAction(
-                    'MIS GRILLAS', 
+                    l10n.text('my_grids'), 
                     Icons.auto_awesome_motion_rounded, 
                     const Color(0xFF8B5CF6), 
                     cardBg,
                     isDark,
-                    () => _showMyGridsList(context)
+                    () => _showMyGridsList(context, l10n)
                   ),
 
                   const SizedBox(height: 24),
@@ -219,16 +203,47 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildSimpleModeButton('Explícame', Icons.psychology_outlined, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExplainMeScreen()))),
+                        child: _buildSimpleModeButton(l10n.text('explain_me'), Icons.psychology_outlined, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExplainMeScreen()))),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildSimpleModeButton('Editor', Icons.edit_rounded, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelEditorScreen()))),
+                        child: _buildSimpleModeButton(l10n.text('editor'), Icons.edit_rounded, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelEditorScreen()))),
                       ),
                     ],
                   ),
 
                   const Spacer(flex: 2),
+                  
+                  // Link de Política de Privacidad
+                  TextButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(l10n.text('privacy_policy_title')),
+                          content: SingleChildScrollView(
+                            child: Text(l10n.text('privacy_policy_content')),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(l10n.text('understood_button')),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Text(
+                      l10n.text('privacy_policy_title'),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.4),
+                        decoration: TextDecoration.underline,
+                        decorationColor: (isDark ? Colors.white : Colors.black).withOpacity(0.2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -247,7 +262,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     );
   }
 
-  Widget _buildThemedDifficultySelector(String current, bool isDark, Color cardBg) {
+  Widget _buildThemedDifficultySelector(String current, bool isDark, Color cardBg, Translations l10n) {
     return Container(
       height: 48,
       padding: const EdgeInsets.all(4),
@@ -272,7 +287,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    d.toUpperCase(),
+                    l10n.text('${d}_mode'),
                     style: TextStyle(
                       color: isSelected ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white38 : Colors.black38),
                       fontWeight: FontWeight.w700,
@@ -289,7 +304,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     );
   }
 
-  Widget _buildPremiumPlayButton(BuildContext context) {
+  Widget _buildPremiumPlayButton(BuildContext context, Translations l10n) {
     return GestureDetector(
       onTap: () {
         ref.read(gameProvider.notifier).startNewLevel(1);
@@ -313,10 +328,10 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
             ),
           ],
         ),
-        child: const Center(
+        child: Center(
           child: Text(
-            'JUGAR AHORA',
-            style: TextStyle(
+            l10n.text('play_now'),
+            style: const TextStyle(
               color: Colors.black,
               fontSize: 20,
               fontWeight: FontWeight.w900,
@@ -374,7 +389,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     );
   }
 
-  void _showMyGridsList(BuildContext context) async {
+  void _showMyGridsList(BuildContext context, Translations l10n) async {
     final prefs = await SharedPreferences.getInstance();
     final String? gridsJson = prefs.getString('my_custom_grids');
     final List<dynamic> savedGrids = gridsJson != null ? json.decode(gridsJson) : [];
@@ -390,11 +405,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('MIS GRILLAS', style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.w800)),
+            Text(l10n.text('my_grids'), style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.w800)),
             const SizedBox(height: 24),
             Expanded(
               child: savedGrids.isEmpty
-                ? Center(child: Text('No tienes grillas guardadas.', style: TextStyle(color: isDark ? Colors.white24 : Colors.black26)))
+                ? Center(child: Text(l10n.text('no_saved_grids'), style: TextStyle(color: isDark ? Colors.white24 : Colors.black26)))
                 : ListView.builder(
                     itemCount: savedGrids.length,
                     itemBuilder: (context, i) {
@@ -408,7 +423,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                         child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                           leading: const Icon(Icons.grid_on_rounded, color: Color(0xFF8B5CF6)),
-                          title: Text('Grilla ${g['width']}x${g['height']}', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+                          title: Text('${l10n.text('grid_label')} ${g['width']}x${g['height']}', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
                           trailing: const Icon(Icons.play_arrow_rounded, color: Color(0xFF10B981), size: 30),
                           onTap: () {
                             final List<GridCell> levelCells = (g['cells'] as List).map((c) => GridCell(

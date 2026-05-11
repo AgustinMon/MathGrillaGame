@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'core/utils/consent_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,9 +24,13 @@ void main() async {
   
   if (!kIsWeb) {
     try {
-      await MobileAds.instance.initialize();
+      final prefs = await SharedPreferences.getInstance();
+      final geography = prefs.getString('geography') ?? 'global';
+      
+      // Pasar el testDeviceId del usuario
+      await ConsentManager.gatherConsent(geography, '5dd73622-0e4d-457b-a1d1-99835fff45a5');
     } catch (e) {
-      debugPrint('Error initializing ads: $e');
+      debugPrint('Error initializing consent/ads: $e');
     }
   }
 

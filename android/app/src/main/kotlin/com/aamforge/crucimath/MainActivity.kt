@@ -1,4 +1,4 @@
-package com.aam.crucimath.crucimath
+package com.aamforge.crucimath
 
 import io.flutter.embedding.android.FlutterActivity
 

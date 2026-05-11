@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../core/utils/translations.dart';
 
 class SettingsState {
@@ -58,8 +59,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final name = prefs.getString('playerName') ?? '';
-    if (name.isNotEmpty) {
-      state = state.copyWith(playerName: name);
+    final geo = prefs.getString('geography') ?? 'global';
+    
+    SettingsState newState = state;
+    if (name.isNotEmpty) newState = newState.copyWith(playerName: name);
+    if (geo != 'global') newState = newState.copyWith(geography: geo);
+    
+    if (newState != state) {
+      state = newState;
     }
   }
 
@@ -77,8 +84,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     state = state.copyWith(tileScale: scale);
   }
 
-  void setGeography(String geo) {
+  void setGeography(String geo) async {
     state = state.copyWith(geography: geo);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('geography', geo);
   }
 
   void setConsent(bool accepted) {
@@ -87,6 +96,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
   void resetConsent() {
     state = state.copyWith(clearConsent: true);
+    // Reiniciar también el SDK de UMP
+    ConsentInformation.instance.reset();
   }
 
   void setScrollbarOnLeft(bool value) {

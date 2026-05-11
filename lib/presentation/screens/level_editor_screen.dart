@@ -5,10 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../domain/entities/puzzle_level.dart';
 import '../../domain/use_cases/math_engine.dart';
 import '../providers/game_provider.dart';
 import '../widgets/math_tile.dart';
+import '../widgets/ad_banner.dart';
+import '../providers/settings_provider.dart';
+import '../../core/utils/translations.dart';
 import 'game_screen.dart';
 
 class LevelEditorScreen extends ConsumerStatefulWidget {
@@ -26,6 +32,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
   String selectedValue = "1";
   bool isDarkMode = true;
   List<dynamic> savedGrids = [];
+  bool _showInstructions = true;
 
   @override
   void initState() {
@@ -88,7 +95,8 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
     // Recortar filas y columnas vacías en los extremos
     final nonEmptyCells = cells.where((c) => c.type != CellType.empty).toList();
     if (nonEmptyCells.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La grilla está vacía.')));
+      final l10n = ref.read(translationsProvider);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.text('empty_grid_error'))));
       return;
     }
 
@@ -120,7 +128,8 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
     savedGrids.add(newGrid);
     await prefs.setString('my_custom_grids', json.encode(savedGrids));
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Grilla guardada!')));
+    final l10n = ref.read(translationsProvider);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.text('grid_saved_success'))));
   }
 
   void _onCellTap(int index) {
@@ -166,6 +175,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = ref.watch(translationsProvider);
     final bgColor = isDarkMode ? const Color(0xFF121212) : Colors.white;
     final gridLineColor = isDarkMode ? Colors.white24 : Colors.black12;
     final cellColor = isDarkMode ? Colors.white24 : Colors.blue.withOpacity(0.05);
@@ -175,10 +185,10 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
       child: Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(
-          title: const Text('Editor'),
+          title: Text(l10n.text('editor')),
           actions: [
             IconButton(icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode), onPressed: () => setState(() => isDarkMode = !isDarkMode)),
-            IconButton(icon: const Icon(Icons.folder_special), onPressed: _showMyGrids),
+            IconButton(icon: const Icon(Icons.folder_special), onPressed: () => _showMyGrids(l10n)),
             IconButton(icon: const Icon(Icons.save), onPressed: _saveGrid),
           ],
         ),
@@ -218,7 +228,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
                                         decoration: BoxDecoration(border: Border.all(color: gridLineColor), color: cell.type == CellType.empty ? null : cellColor),
                                         child: cell.type == CellType.empty 
                                           ? null 
-                                          : Draggable<int>(
+                                          : LongPressDraggable<int>(
                                               data: index,
                                               feedback: Material(color: Colors.transparent, child: MathTile(value: cell.value ?? '', size: 50, animateOnEntry: false)),
                                               childWhenDragging: const SizedBox.shrink(),
@@ -235,46 +245,29 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
                       ),
                     ),
                   ),
-                  _buildFloatingControls(),
-                  Positioned(
-                    top: 16,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.black54 : Colors.white70,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '👆 Selecciona abajo y toca la grilla para dibujar',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
-                        ),
-                      ).animate(onPlay: (c) => c.repeat(reverse: true)).fadeIn(duration: 1.seconds).scale(begin: const Offset(0.95, 0.95), end: const Offset(1.05, 1.05)),
-                    ),
-                  ),
+                  _buildFloatingControls(l10n),
                 ],
               ),
             ),
-            _buildToolbar(),
+            _buildToolbar(l10n),
+            const AdBanner(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFloatingControls() {
+  Widget _buildFloatingControls(Translations l10n) {
     return Positioned(right: 10, top: 10, child: Column(children: [
       FloatingActionButton.small(heroTag: 'add_col', onPressed: _addColumn, child: const Icon(Icons.view_column)),
       const SizedBox(height: 10),
       FloatingActionButton.small(heroTag: 'add_row', onPressed: _addRow, child: const Icon(Icons.table_rows)),
       const SizedBox(height: 10),
-      FloatingActionButton.small(heroTag: 'calc', onPressed: _showCalculator, backgroundColor: Colors.amber, child: const Icon(Icons.calculate, color: Colors.black)),
+      FloatingActionButton.small(heroTag: 'calc', onPressed: () => _showCalculator(l10n), backgroundColor: Colors.amber, child: const Icon(Icons.calculate, color: Colors.black)),
     ]));
   }
 
-  void _showCalculator() {
+  void _showCalculator(Translations l10n) {
     String calcText = "0";
     String operator = "";
     double firstOperand = 0;
@@ -334,7 +327,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
         return AlertDialog(
           backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.grey[200],
           contentPadding: const EdgeInsets.all(16),
-          title: Text('Calculadora', style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white : Colors.black)),
+          title: Text(l10n.text('calculator_title'), style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white : Colors.black)),
           content: SizedBox(
             width: 200,
             child: Column(
@@ -359,7 +352,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
     );
   }
 
-  void _showMyGrids() {
+  void _showMyGrids(Translations l10n) {
     showModalBottomSheet(
       context: context,
       backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
@@ -369,23 +362,22 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Mis Grillas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(l10n.text('my_grids'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const Divider(),
             Expanded(
               child: savedGrids.isEmpty 
-                ? const Center(child: Text('No has guardado grillas aún.'))
+                ? Center(child: Text(l10n.text('no_grids_yet')))
                 : ListView.builder(
                     itemCount: savedGrids.length,
                     itemBuilder: (context, i) {
                       final g = savedGrids[i];
                       return ListTile(
                         leading: const Icon(Icons.grid_on),
-                        title: Text('Grilla ${g['width']}x${g['height']}'),
-                        subtitle: Text('Fecha: ${g['date'].toString().split('T')[0]}'),
+                        title: Text('${l10n.text('grid_label')} ${g['width']}x${g['height']}'),
+                        subtitle: Text('${l10n.text('date_label')}: ${g['date'].toString().split('T')[0]}'),
                         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(icon: const Icon(Icons.share, color: Colors.orange), onPressed: () {
-                            Clipboard.setData(ClipboardData(text: json.encode(g)));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nivel copiado al portapapeles para compartir')));
+                            _shareGridPdf(g, l10n);
                           }),
                           IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _loadGridForEditing(g)),
                           IconButton(icon: const Icon(Icons.play_arrow, color: Colors.green), onPressed: () => _playCustomGrid(g)),
@@ -421,8 +413,93 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
     Navigator.push(context, MaterialPageRoute(builder: (context) => const GameScreen()));
   }
 
-  Widget _buildToolbar() {
+  void _shareGridPdf(Map<String, dynamic> gridData, Translations l10n) async {
+    final pdf = pw.Document();
+    
+    final int width = gridData['width'];
+    final int height = gridData['height'];
+    final List<dynamic> cellsData = gridData['cells'];
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text('MathGrillaGame - ${l10n.text('custom_level_title')}', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 20),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  child: pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.black, width: 1),
+                    children: List.generate(height, (y) {
+                      return pw.TableRow(
+                        children: List.generate(width, (x) {
+                          final cell = cellsData.firstWhere(
+                            (c) => c['x'] == x && c['y'] == y, 
+                            orElse: () => null
+                          );
+                          
+                          final bool isEmpty = cell == null || cell['type'] == CellType.empty.index;
+                          final String val = isEmpty ? '' : (cell['value'] ?? '');
+
+                          return pw.Container(
+                            width: 30,
+                            height: 30,
+                            color: isEmpty ? PdfColors.grey300 : PdfColors.white,
+                            child: pw.Center(
+                              child: pw.Text(val, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                            ),
+                          );
+                        }),
+                      );
+                    }),
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text(l10n.text('solve_this_puzzle'), style: const pw.TextStyle(fontSize: 16)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.sharePdf(bytes: await pdf.save(), filename: 'mathgrillagame_nivel.pdf');
+  }
+
+  Widget _buildToolbar(Translations l10n) {
     return Container(padding: const EdgeInsets.all(16), color: isDarkMode ? Colors.black26 : Colors.grey[200], child: Column(children: [
+      if (_showInstructions)
+        GestureDetector(
+          onTap: () => setState(() => _showInstructions = false),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.blueAccent.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blueAccent),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.info_outline, color: Colors.blueAccent, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.text('select_tool_instruction'),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const Icon(Icons.close, color: Colors.blueAccent, size: 16),
+              ],
+            ),
+          ),
+        ),
       Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
         _typeButton(CellType.number, Icons.numbers),
         _typeButton(CellType.operator, Icons.add),

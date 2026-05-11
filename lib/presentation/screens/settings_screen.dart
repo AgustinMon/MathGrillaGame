@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/math_settings.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/game_provider.dart';
 import '../providers/settings_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -32,25 +34,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
 
+    final l10n = ref.watch(translationsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración'),
+        title: Text(l10n.text('settings_title')),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _buildSection(context, 'Perfil'),
+          _buildSection(context, l10n.text('profile_section')),
           ListTile(
-            title: const Text('Nombre de Jugador'),
-            subtitle: const Text('Se mostrará en tus estadísticas'),
+            title: Text(l10n.text('player_name_label')),
+            subtitle: Text(l10n.text('stats_appearance')),
             trailing: SizedBox(
               width: 150,
               child: TextField(
                 controller: _nameController,
                 decoration: InputDecoration(
-                  hintText: 'Tu nombre',
+                  hintText: l10n.text('player_name_hint'),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                 ),
@@ -59,84 +62,124 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           
-          _buildSection(context, 'Apariencia'),
+          _buildSection(context, l10n.text('appearance_section')),
+          ListTile(
+            title: Text(l10n.text('language_label')),
+            trailing: DropdownButton<String>(
+              value: settings.locale.languageCode,
+              items: const [
+                DropdownMenuItem(value: 'en', child: Text('English')),
+                DropdownMenuItem(value: 'es', child: Text('Español')),
+              ],
+              onChanged: (val) {
+                if (val != null) notifier.setLocale(Locale(val));
+              },
+            ),
+          ),
           SwitchListTile(
-            title: const Text('Modo Oscuro'),
+            title: Text(l10n.text('dark_mode_label')),
             value: settings.themeMode == ThemeMode.dark,
             activeThumbColor: AppTheme.primaryBlue,
             onChanged: (val) => notifier.toggleTheme(),
           ),
           
           
-          _buildSection(context, 'Tamaño de Números'),
+          _buildSection(context, l10n.text('number_size_section')),
           Row(
             children: [
-              _buildSizeOption(context, ref, 'Chico', 0.8, settings.tileScale),
-              _buildSizeOption(context, ref, 'Normal', 1.0, settings.tileScale),
-              _buildSizeOption(context, ref, 'Grande', 1.2, settings.tileScale),
+              _buildSizeOption(context, ref, l10n.text('small_label'), 0.8, settings.tileScale),
+              _buildSizeOption(context, ref, l10n.text('normal_label'), 1.0, settings.tileScale),
+              _buildSizeOption(context, ref, l10n.text('large_label'), 1.2, settings.tileScale),
             ],
           ),
 
-          _buildSection(context, 'Accesibilidad'),
+          _buildSection(context, l10n.text('accessibility_section')),
           SwitchListTile(
-            title: const Text('Barra de scroll a la izquierda'),
-            subtitle: const Text('Útil para usuarios zurdos'),
+            title: Text(l10n.text('scrollbar_left_label')),
+            subtitle: Text(l10n.text('scrollbar_left_subtitle')),
             value: settings.scrollbarOnLeft,
             activeColor: AppTheme.primaryBlue,
             onChanged: (val) => notifier.setScrollbarOnLeft(val),
           ),
 
           const Divider(height: 40),
-          _buildSection(context, 'Privacidad y Cumplimiento'),
+          _buildSection(context, l10n.text('privacy_compliance_section')),
           ListTile(
-            title: const Text('Estado de Consentimiento'),
+            title: Text(l10n.text('consent_status_label')),
             subtitle: Text(
               settings.consentAccepted == null 
-                ? 'Pendiente' 
-                : (settings.consentAccepted! ? 'Aceptado' : 'Rechazado')
+                ? l10n.text('pending_status') 
+                : (settings.consentAccepted! ? l10n.text('accepted_status') : l10n.text('rejected_status'))
             ),
             trailing: TextButton(
               onPressed: () => notifier.resetConsent(),
-              child: const Text('RESETEAR'),
+              child: Text(l10n.text('reset_button')),
             ),
           ),
-          
-          const Divider(height: 40),
-          _buildSection(context, 'Debug (Solo Desarrollo)'),
-          
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text('Simular Geografía para Consentimiento:', style: TextStyle(fontSize: 12)),
-          ),
-          Row(
-            children: [
-              _buildGeoOption(context, ref, 'Global', 'global', settings.geography),
-              _buildGeoOption(context, ref, 'Europa (UE)', 'ue', settings.geography),
-              _buildGeoOption(context, ref, 'USA (CCPA)', 'usa', settings.geography),
-            ],
-          ),
-
-          const SizedBox(height: 20),
           ListTile(
-            title: const Text('Saltar a Nivel'),
-            subtitle: const Text('Introduce un número para probar niveles avanzados'),
-            trailing: SizedBox(
-              width: 80,
-              child: TextField(
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(hintText: 'Nivel'),
-                onSubmitted: (val) {
-                  final level = int.tryParse(val);
-                  if (level != null && level > 0) {
-                    ref.read(gameProvider.notifier).startNewLevel(level);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Saltando al nivel $level')),
-                    );
-                  }
-                },
+            title: Text(l10n.text('privacy_policy_title')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(l10n.text('privacy_policy_title')),
+                  content: SingleChildScrollView(
+                    child: Text(l10n.text('privacy_policy_content')),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => launchUrl(Uri.parse(l10n.text('privacy_policy_url'))),
+                      child: Text(l10n.text('privacy_policy_button')),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(l10n.text('understood_button')),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          
+          if (kDebugMode) ...[
+            const Divider(height: 40),
+            _buildSection(context, l10n.text('debug_section')),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(l10n.text('simulate_geo_label'), style: const TextStyle(fontSize: 12)),
+            ),
+            Row(
+              children: [
+                _buildGeoOption(context, ref, 'Global', 'global', settings.geography),
+                _buildGeoOption(context, ref, 'Europa (UE)', 'ue', settings.geography),
+                _buildGeoOption(context, ref, 'USA (CCPA)', 'usa', settings.geography),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            ListTile(
+              title: Text(l10n.text('jump_to_level_label')),
+              subtitle: Text(l10n.text('jump_to_level_hint')),
+              trailing: SizedBox(
+                width: 80,
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(hintText: l10n.text('jump_to_level_hint')),
+                  onSubmitted: (val) {
+                    final level = int.tryParse(val);
+                    if (level != null && level > 0) {
+                      ref.read(gameProvider.notifier).startNewLevel(level);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(l10n.translate('jumping_to_level_msg', args: {'level': level.toString()}))),
+                      );
+                    }
+                  },
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

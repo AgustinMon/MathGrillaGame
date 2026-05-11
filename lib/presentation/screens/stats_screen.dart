@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -31,16 +32,8 @@ class StatsScreen extends ConsumerWidget {
             color: Colors.white,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.white70),
-            onPressed: () {
-              // Lógica de compartir screenshot
-            },
-          ),
-        ],
       ),
-      body: FutureBuilder<Map<String, int>>(
+      body: FutureBuilder<Map<String, dynamic>>(
         future: StatsRepository().getStats(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
@@ -52,8 +45,57 @@ class StatsScreen extends ConsumerWidget {
           final won = stats['gamesWon'] ?? 0;
           final score = stats['totalScore'] ?? 0;
           final combo = stats['bestCombo'] ?? 0;
-
+          
+          final totalTime = stats['totalTime'] ?? 0;
+          final bestTime = stats['bestTime'] ?? 0;
+          final bestTimeEq = stats['bestTimeEq'] ?? 0;
+          final hourDataStr = stats['hourData'] as String? ?? '{}';
+          
           final winRate = played > 0 ? (won / played * 100).toStringAsFixed(1) : '0.0';
+          
+          // Calcular el promedio de tiempo
+          String avgTimeText = "0s";
+          if (won > 0) {
+            int avgSeconds = (totalTime / won).round();
+            avgTimeText = "${avgSeconds}s";
+            if (avgSeconds >= 60) {
+              avgTimeText = "${avgSeconds ~/ 60}m ${avgSeconds % 60}s";
+            }
+          }
+
+          // Formatear el mejor tiempo
+          String bestTimeText = "N/A";
+          if (bestTime > 0 && bestTime < 999999) {
+            bestTimeText = "${bestTime}s ($bestTimeEq cuentas)";
+            if (bestTime >= 60) {
+              bestTimeText = "${bestTime ~/ 60}m ${bestTime % 60}s ($bestTimeEq cuentas)";
+            }
+          }
+          
+          // Determinar el horario más rápido
+          String fastestHourText = "N/A";
+          try {
+            final Map<String, dynamic> hourData = json.decode(hourDataStr);
+            double bestAvg = double.infinity;
+            String bestHour = "";
+            hourData.forEach((hour, data) {
+              int hTime = data['totalTime'] ?? 0;
+              int hCount = data['count'] ?? 0;
+              if (hCount > 0) {
+                double avg = hTime / hCount;
+                if (avg < bestAvg) {
+                  bestAvg = avg;
+                  bestHour = hour;
+                }
+              }
+            });
+            if (bestHour.isNotEmpty) {
+              int h = int.parse(bestHour);
+              fastestHourText = "${h.toString().padLeft(2, '0')}:00";
+            }
+          } catch (e) {
+            // Ignorar errores de parseo JSON
+          }
 
           return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -70,6 +112,14 @@ class StatsScreen extends ConsumerWidget {
                   icon: Icons.videogame_asset,
                   accentColor: Colors.amberAccent,
                   delay: 200.ms,
+                ),
+                _buildStatCard(
+                  title: 'DESEMPEÑO Y TIEMPOS',
+                  mainText: 'Récords',
+                  subText: '⏱️ Promedio: $avgTimeText\n⚡ Mejor tiempo: $bestTimeText\n🕰️ Horario más rápido: $fastestHourText',
+                  icon: Icons.timer,
+                  accentColor: Colors.pinkAccent,
+                  delay: 300.ms,
                 ),
                 _buildStatCard(
                   title: 'PUNTUACIÓN TOTAL',

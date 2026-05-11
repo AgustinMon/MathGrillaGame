@@ -17,7 +17,7 @@ class _AdBannerState extends State<AdBanner> {
   String get adUnitId {
     if (kIsWeb) return ''; // Not used for now on web
     return Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/6300978111' // Test ID
+      ? 'ca-app-pub-0815276588564171/5539822627' // Production ID
       : 'ca-app-pub-3940256099942544/2934735716'; // Test ID iOS
   }
 

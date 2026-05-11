@@ -35,8 +35,8 @@ class MathTile extends ConsumerWidget {
     if (value.trim().isNotEmpty && int.tryParse(value.trim()) == null) {
       fontSize += 4;
     } else if (isInventory && value.trim().length < 3 && int.tryParse(value.trim()) != null) {
-      // Achicamos los números del inventario de 1 y 2 cifras (2 puntos)
-      fontSize -= 2;
+      // Achicamos los números del inventario de 1 y 2 cifras (1 punto)
+      fontSize -= 1;
     }
     final bool isEmpty = value.trim().isEmpty;
 
@@ -56,14 +56,14 @@ class MathTile extends ConsumerWidget {
     } else if (isInventory) {
       // Fichas en el inventario
       bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-      borderColor = isDark ? const Color(0xFF4ADE80) : Colors.blue.shade600; // Azul claro para el borde
-      textColor = isDark ? const Color(0xFF4ADE80) : Colors.indigo.shade900; // Azul oscuro para el texto
+      borderColor = isDark ? const Color(0xFF3A332C) : Colors.blue.shade600; // Marrón igual a la grilla para el borde
+      textColor = isDark ? Colors.white : Colors.indigo.shade900; // Blanco para el texto
       borderWidth = 1.5;
     } else {
       // Celda con texto en la grilla (fija o colocada)
-      bgColor = isDark ? const Color(0xFF3A332C) : const Color(0xFFFDEECA); // Marrón grisáceo o Beige claro
-      borderColor = isDark ? Colors.white54 : Colors.black87;
-      textColor = isDark ? const Color(0xFFE0E0E0) : Colors.black;
+      bgColor = isDark ? const Color(0xFF3A332C) : const Color(0xFF318CE7); // Marrón oscuro o Azul Francia
+      borderColor = isDark ? Colors.white54 : const Color(0xFF1F6EBD); // Borde azul oscuro en modo claro
+      textColor = isDark ? const Color(0xFFE0E0E0) : Colors.white;
       
       // Si explícitamente se pasa un color verde de resuelto, podemos teñir suavemente
       if (color == Colors.green) {
