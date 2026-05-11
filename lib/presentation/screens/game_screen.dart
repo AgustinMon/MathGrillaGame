@@ -32,6 +32,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   final TransformationController _transformationController = TransformationController();
   RewardedAd? _rewardedAd;
   bool _isAdLoaded = false;
+  bool _isInventoryCollapsed = false;
 
   @override
   void initState() {
@@ -44,28 +45,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     });
   }
 
-  double _getGridSize(int gridSize, double screenWidth) {
-    final cellSize = screenWidth / (gridSize > 14 ? (gridSize > 22 ? 22 : 14) : 10);
-    final spacing = gridSize > 20 ? 1.0 : 2.0;
-    return (cellSize * gridSize) + (spacing * (gridSize - 1));
-  }
-
   void _centerGrid([Size? availableSize]) {
     if (!mounted) return;
-    final gameState = ref.read(gameProvider);
-    if (gameState.currentLevel == null) return;
-
-    final screenSize = MediaQuery.of(context).size;
-    final viewSize = availableSize ?? screenSize;
-    final gridSize = gameState.currentLevel!.size;
-    final totalGridSize = _getGridSize(gridSize, screenSize.width);
-    
-    // Calculamos el offset horizontal para que el centro de la grilla coincida con el centro de la pantalla
-    final x = (max(totalGridSize, viewSize.width) - viewSize.width) / 2;
-    // Siempre pegado arriba
-    final y = 0.0; 
-
-    _transformationController.value = Matrix4.identity()..translate(-x, -y);
+    // La grilla se auto-ajusta al 100% del ancho en _buildGrid y se centra sola.
+    // Solo reseteamos el controlador para asegurar que el usuario la vea correctamente
+    // sin zoom ni desplazamientos extraños al iniciar un nivel.
+    _transformationController.value = Matrix4.identity();
   }
 
   void _loadRewardedAd() {
@@ -130,6 +115,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final gameState = ref.watch(gameProvider);
     final refNotifier = ref.read(gameProvider.notifier);
     final l10n = ref.watch(translationsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Escuchamos eventos especiales para diálogos
     ref.listen(gameProvider, (previous, next) {
@@ -141,8 +127,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       }
       
       if (next.levelNumber != previous?.levelNumber) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (mounted) _centerGrid();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) _centerGrid();
+          });
         });
       }
 
@@ -162,27 +150,29 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Theme.of(context).brightness == Brightness.light ? Brightness.dark : Brightness.light,
-          statusBarBrightness: Theme.of(context).brightness == Brightness.light ? Brightness.light : Brightness.dark,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
         child: Scaffold(
+          backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
           body: Stack(
             children: [
               SafeArea(
-                bottom: false, // El inventario ya maneja su propio margen inferior
+                bottom: false, 
                 child: Column(
               children: [
-                _buildHeader(context, gameState, ref, l10n), // Barra superior con estadísticas.
+                _buildHeader(context, gameState, ref, l10n),
                 Expanded(
-                  child: Align(
-                    alignment: Alignment.topCenter,
+                  child: Container(
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    width: double.infinity,
                     child: _buildGrid(context, gameState, ref, l10n),
-                  ), // El tablero de juego.
+                  ),
                 ),
-                _buildActionButtons(gameState, ref, l10n), // Botones de Deshacer y Pista
-                if (gameState.difficulty == 'hard') _buildMachine(gameState, l10n), // Nueva máquina de fusión
-                _buildFooter(gameState, l10n), // Inventario de piezas arrastrables.
-                const AdBanner(), // Banner publicitario.
+                _buildFooter(gameState, l10n),
+                _buildActionButtons(gameState, ref, l10n),
+                if (gameState.difficulty == 'hard') _buildMachine(gameState, l10n),
+                const AdBanner(), 
               ],
             ).animate(target: gameState.errorTrigger.toDouble()).shake(hz: 8, curve: Curves.easeInOut, offset: const Offset(4, 0)),
           ),
@@ -297,113 +287,173 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   Widget _buildHeader(BuildContext context, GameState state, WidgetRef ref, Translations l10n) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final primaryColor = isLight ? Colors.black : Colors.white;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? Colors.indigo.shade200 : Colors.indigo.shade800;
+    final textColor = isDark ? const Color(0xFFE0E0E0) : Colors.black87;
+    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9);
+    final buttonBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
+    Widget buildCircularButton(IconData icon, VoidCallback onTap) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: buttonBg,
+            shape: BoxShape.circle,
+            border: Border.all(color: iconColor.withOpacity(isDark ? 0.6 : 0.3), width: 1.5),
+          ),
+          child: Icon(icon, color: iconColor, size: 22),
+        ),
+      );
+    }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isLight ? Colors.white.withOpacity(0.5) : Colors.black26,
-        border: Border(bottom: BorderSide(color: primaryColor.withOpacity(0.1))),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      color: bgColor,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _StatItem(
-                label: l10n.text('lives_label'),
-                value: '${state.lives}',
-                isWarning: state.lives < 2,
-                color: Colors.redAccent, 
-              ).animate(target: state.lifeLostTrigger.toDouble())
-               .shake(duration: 500.ms, hz: 10, offset: const Offset(5, 0))
-               .tint(color: Colors.red, duration: 200.ms).then().tint(color: Colors.transparent),
-              const SizedBox(width: 15),
-              _StatItem(
-                label: 'NIVEL',
-                value: state.isDailyChallenge ? 'DIA' : '${state.levelNumber}',
-                color: primaryColor,
+              Row(
+                children: [
+                  buildCircularButton(Icons.arrow_back, () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => TutorialScreen()))),
+                  const SizedBox(width: 12),
+                  buildCircularButton(Icons.refresh, () => ref.read(gameProvider.notifier).startNewLevel(state.levelNumber)),
+                ],
               ),
-              const SizedBox(width: 15),
-              _StatItem(
-                label: 'PUNTOS',
-                value: '${state.score}',
-                color: primaryColor,
-              ),
+              buildCircularButton(Icons.settings_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
             ],
           ),
-          
+          const SizedBox(height: 16),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _StatItem(
-                label: l10n.text('time_label'),
-                value: '${state.timeLeft}s',
-                isWarning: state.isTimerCountDown && state.timeLeft < 15,
-                color: primaryColor,
+              // Vidas y Nivel
+              Row(
+                children: [
+                  const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${state.lives}',
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'NIVEL ${state.levelNumber}',
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
               ),
-              IconButton(
-                icon: Icon(state.isTimerPaused ? Icons.play_arrow : Icons.pause, color: primaryColor, size: 20),
-                onPressed: () => ref.read(gameProvider.notifier).togglePause(),
+              // Cartel de Combo en el centro (si aplica)
+              if (state.comboCount > 1)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange, width: 1),
+                  ),
+                  child: Text(
+                    'COMBO x${state.comboCount}',
+                    style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w900, fontSize: 12),
+                  ),
+                ).animate().scale().shimmer()
+              else
+                const SizedBox.shrink(),
+              // Tiempo
+              GestureDetector(
+                onTap: () => ref.read(gameProvider.notifier).togglePause(),
+                child: Row(
+                  children: [
+                    Text(
+                      '${(state.timeLeft ~/ 60).toString().padLeft(2, '0')}:${(state.timeLeft % 60).toString().padLeft(2, '0')}',
+                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(state.isTimerPaused ? Icons.play_arrow : Icons.pause, color: textColor, size: 18),
+                  ],
+                ),
               ),
             ],
-          ),
-
-          IconButton(
-            icon: Icon(Icons.settings, color: primaryColor),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 600.ms).slideY(begin: -0.1);
+    );
   }
 
   /// Construye la cuadrícula dinámica del puzzle.
   Widget _buildGrid(BuildContext context, GameState state, WidgetRef ref, Translations l10n) {
     if (state.currentLevel == null) return const CircularProgressIndicator();
 
-    final size = state.currentLevel!.size;
-    final screenSize = MediaQuery.of(context).size;
-    final spacing = size > 20 ? 1.0 : 2.0;
-    final totalGridSize = _getGridSize(size, screenSize.width);
+    final cells = state.currentLevel!.cells;
+    final originalSize = state.currentLevel!.size;
+
+    // 1. AUTO-RECORTE: Encontrar el área real del puzzle
+    int minX = originalSize, maxX = 0, minY = originalSize, maxY = 0;
+    bool hasContent = false;
+    for (var cell in cells) {
+      if (cell.type != CellType.empty) {
+        minX = min(minX, cell.x);
+        maxX = max(maxX, cell.x);
+        minY = min(minY, cell.y);
+        maxY = max(maxY, cell.y);
+        hasContent = true;
+      }
+    }
+
+    if (!hasContent) { minX = 0; maxX = 4; minY = 0; maxY = 4; }
+
+    final int gridW = maxX - minX + 1;
+    final int gridH = maxY - minY + 1;
+    final spacing = 0.0; // Eliminamos el espacio para look de crucigrama clásico
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final viewWidth = constraints.maxWidth;
-        final viewHeight = constraints.maxHeight;
-        final containerWidth = max(totalGridSize, viewWidth);
-        final containerHeight = max(totalGridSize, viewHeight);
+        // La grilla ocupa casi todo el ancho disponible, con un ligero margen
+        final double availW = constraints.maxWidth - 16; 
+        
+        // El tamaño de celda se calcula para llenar el ancho del teléfono
+        final double cellSize = (availW - (spacing * (gridW - 1))) / gridW;
+        
+        final double finalW = (cellSize * gridW) + (spacing * (gridW - 1));
+        final double finalH = (cellSize * gridH) + (spacing * (gridH - 1));
 
         return InteractiveViewer(
           transformationController: _transformationController,
-          boundaryMargin: const EdgeInsets.fromLTRB(800, 0, 800, 1500),
-          minScale: 0.1,
-          maxScale: 4.0,
+          boundaryMargin: const EdgeInsets.symmetric(vertical: 800, horizontal: 200),
+          minScale: 0.5,
+          maxScale: 3.0,
           constrained: false,
           child: Container(
-            width: containerWidth,
-            height: containerHeight,
-            alignment: Alignment.topCenter,
-            color: Colors.transparent,
-            child: Container(
-              width: totalGridSize,
-              height: totalGridSize,
+            width: finalW,
+            height: max(finalH, constraints.maxHeight),
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: finalW,
+              height: finalH,
               child: GridView.builder(
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: size,
+                  crossAxisCount: gridW,
                   mainAxisSpacing: spacing,
                   crossAxisSpacing: spacing,
                 ),
-                itemCount: size * size,
+                itemCount: gridW * gridH,
                 itemBuilder: (context, index) {
-                  final x = index % size;
-                  final y = index ~/ size;
-                  final cell = state.currentLevel!.cells.firstWhere(
+                  final x = minX + (index % gridW);
+                  final y = minY + (index ~/ gridW);
+                  final cell = cells.firstWhere(
                     (c) => c.x == x && c.y == y,
                     orElse: () => GridCell(x: x, y: y, type: CellType.empty),
                   );
-                  return _buildCell(cell, state, ref, l10n);
+                  
+                  // Si la celda es totalmente vacía (fuera del camino del crucigrama), 
+                  // no dibujamos nada para mantener la estética de crucigrama.
+                  if (cell.type == CellType.empty) return const SizedBox.shrink();
+
+                  return _buildCell(cell, state, ref, l10n, cellSize);
                 },
               ),
             ),
@@ -414,17 +464,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   /// Construye una celda individual que puede aceptar piezas arrastradas.
-  Widget _buildCell(GridCell cell, GameState state, WidgetRef ref, Translations l10n) {
-    if (cell.type == CellType.empty) return const SizedBox.shrink();
-
-    final size = state.currentLevel?.size ?? 5;
-
+  Widget _buildCell(GridCell cell, GameState state, WidgetRef ref, Translations l10n, double cellSize) {
     // Verificamos si esta celda es parte de una ecuación ya resuelta.
     final isSolved = state.solvedCells.contains('${cell.x},${cell.y}');
 
     return DragTarget<Map<String, dynamic>>(
       onAcceptWithDetails: (details) {
-        // El valor viene en el mapa: {'value': String, 'isMachine': bool}
         final value = details.data['value'] as String;
         final notifier = ref.read(gameProvider.notifier);
         
@@ -450,114 +495,103 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             // Si el usuario toca la celda, quitamos la pieza (si no es fija).
             ref.read(gameProvider.notifier).removeTile(cell.x, cell.y);
           },
-          child: Container(
-            decoration: BoxDecoration(
-              color: isSolved
-                  ? Colors.green.withOpacity(0.3)
-                  : (Theme.of(context).brightness == Brightness.light
-                      ? const Color(0xFFFFFDD0) // Cream
-                      : const Color(0xFF2D2D2D)), // Darker pastel
-              borderRadius: BorderRadius.circular(size > 12 ? 2 : 4),
-              border: Border.all(
-                color: isSolved
-                    ? Colors.greenAccent
-                    : (cell.isFixed
-                        ? Theme.of(context).colorScheme.primary.withOpacity(0.5)
-                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
-                width: isSolved ? 2.0 : 1.0,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                cell.currentValue ?? (cell.isFixed ? cell.value! : ''),
-                overflow: TextOverflow.visible,
-                softWrap: false,
-                style: TextStyle(
-                  fontSize: (size > 30 ? 6 : (size > 25 ? 8 : (size > 20 ? 10 : (size > 12 ? 14 : 18)))) 
-                    * ref.watch(settingsProvider).tileScale
-                    * ((cell.currentValue?.length ?? cell.value?.length ?? 0) > 2 ? 0.8 : 1.0),
-                  fontWeight: FontWeight.bold,
-                  color: isSolved
-                      ? Colors.white
-                      : (cell.isFixed 
-                          ? Theme.of(context).colorScheme.onSurface 
-                          : Colors.blueAccent),
-                ),
-              ),
-            ),
-          ).animate(target: isSolved ? 1 : 0).shimmer(duration: 1.seconds),
+          child: MathTile(
+            value: cell.currentValue ?? (cell.isFixed ? cell.value! : ''),
+            size: cellSize,
+            color: isSolved ? Colors.green : (cell.isFixed ? null : Colors.blueAccent),
+            animateOnEntry: cell.currentValue != null,
+          ),
         );
       },
     );
   }
 
   Widget _buildFooter(GameState state, Translations l10n) {
-    // Obtenemos y ordenamos ambos sets de piezas
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final footerTiles = List<String>.from(state.currentLevel?.footerTiles ?? [])..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
     final machineTiles = List<String>.from(state.machineTiles)..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
     
     if (footerTiles.isEmpty && machineTiles.isEmpty && state.machineInputA == null && state.machineInputB == null) return const SizedBox.shrink();
 
-    final scrollbarLeft = ref.watch(settingsProvider).scrollbarOnLeft;
-
-    final isLight = Theme.of(context).brightness == Brightness.light;
-
     return Container(
-      constraints: const BoxConstraints(maxHeight: 140), 
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 5),
-      decoration: BoxDecoration(
-        color: isLight ? Colors.white.withOpacity(0.9) : Colors.black54,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        border: Border(top: BorderSide(color: isLight ? Colors.black12 : Colors.white.withOpacity(0.1), width: 2)),
-      ),
-      child: Directionality(
-        textDirection: scrollbarLeft ? TextDirection.rtl : TextDirection.ltr,
-        child: RawScrollbar(
-          controller: _footerScrollController,
-          thumbColor: AppTheme.primaryBlue.withOpacity(0.5),
-          radius: const Radius.circular(20),
-          thickness: 6,
-          thumbVisibility: true,
-          child: Directionality(
-            textDirection: TextDirection.ltr,
-            child: SingleChildScrollView(
-              controller: _footerScrollController,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (footerTiles.isNotEmpty) ...[
-                    Text(l10n.text('numbers_label'), style: TextStyle(color: isLight ? Colors.black54 : Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    _buildTileGrid(footerTiles, isMachine: false),
-                    const SizedBox(height: 16),
-                  ],
-                  if (machineTiles.isNotEmpty) ...[
-                    Text(l10n.text('ingredients_label'), style: const TextStyle(color: Colors.pinkAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    _buildTileGrid(machineTiles, isMachine: true),
-                  ],
-                ],
+      color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      width: double.infinity,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isDark ? const Color(0xFF333333) : Colors.grey.shade300, width: 1.5),
+        ),
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: () => setState(() => _isInventoryCollapsed = !_isInventoryCollapsed),
+              onVerticalDragEnd: (details) {
+                if (details.primaryVelocity != null) {
+                  if (details.primaryVelocity! > 0) {
+                    setState(() => _isInventoryCollapsed = true);
+                  } else if (details.primaryVelocity! < 0) {
+                    setState(() => _isInventoryCollapsed = false);
+                  }
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                color: Colors.transparent, // Asegura que se detecten los toques
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              constraints: BoxConstraints(maxHeight: _isInventoryCollapsed ? 100 : 350),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    if (footerTiles.isNotEmpty) _buildTileGrid(footerTiles, isMachine: false),
+                    if (machineTiles.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildTileGrid(machineTiles, isMachine: true),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    ).animate().slideY(begin: 1, duration: 500.ms, curve: Curves.easeOutCubic);
+    );
   }
 
   Widget _buildTileGrid(List<String> tiles, {required bool isMachine}) {
+    final screenSize = MediaQuery.of(context).size;
+    final double inventorySize = (screenSize.width / 9 * 0.85).clamp(40.0, 50.0);
+
     return Wrap(
       spacing: 6,
       runSpacing: 6,
+      alignment: WrapAlignment.center,
       children: tiles.map((value) {
         return Draggable<Map<String, dynamic>>(
           data: {'value': value, 'isMachine': isMachine},
-          feedback: MathTile(value: value, size: 40, color: isMachine ? Colors.pinkAccent : null),
+          feedback: MathTile(value: value, size: inventorySize + 5, color: isMachine ? Colors.pinkAccent : null, isInventory: true),
           childWhenDragging: Opacity(
             opacity: 0.2,
-            child: MathTile(value: value, size: 35, color: isMachine ? Colors.pinkAccent : null),
+            child: MathTile(value: value, size: inventorySize, color: isMachine ? Colors.pinkAccent : null, isInventory: true),
           ),
-          child: MathTile(value: value, size: 35, color: isMachine ? Colors.pinkAccent : null),
+          child: MathTile(value: value, size: inventorySize, color: isMachine ? Colors.pinkAccent : null, isInventory: true),
         );
       }).toList(),
     );
@@ -994,63 +1028,50 @@ class _StatItem extends StatelessWidget {
 
 extension GameScreenActions on _GameScreenState {
   Widget _buildActionButtons(GameState state, WidgetRef ref, Translations l10n) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Botón Deshacer
-            _ActionButton(
-              onTap: () => ref.read(gameProvider.notifier).undoMove(),
-              icon: Icons.undo,
-              color: Colors.amber,
-            ),
-            const SizedBox(width: 12),
-            // Botón Pista con opción de video si se agotan
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (state.hintsRemaining == 0)
-                  GestureDetector(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? Colors.indigo.shade200 : Colors.indigo.shade800;
+
+    return Container(
+      color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _ActionButton(
+            onTap: () => ref.read(gameProvider.notifier).undoMove(),
+            icon: Icons.undo,
+            color: iconColor,
+          ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _ActionButton(
+                onTap: () => ref.read(gameProvider.notifier).useHint(),
+                icon: Icons.lightbulb,
+                color: Colors.amber.shade700,
+                isFilled: true,
+                badgeNumber: state.hintsRemaining,
+              ),
+              if (state.hintsRemaining == 0)
+                Positioned(
+                  right: -5,
+                  top: -5,
+                  child: GestureDetector(
                     onTap: _showRewardedAd,
                     child: Container(
-                      margin: const EdgeInsets.only(bottom: 4),
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.greenAccent.withOpacity(0.2),
+                        color: Colors.blueAccent,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.greenAccent, width: 1),
+                        border: Border.all(color: Colors.white, width: 1.5),
                       ),
-                      child: const Icon(Icons.play_arrow, color: Colors.greenAccent, size: 16),
+                      child: const Icon(Icons.play_arrow, color: Colors.white, size: 12),
                     ),
-                  ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2), duration: 1.seconds, curve: Curves.easeInOut).shimmer(duration: 2.seconds),
-                _ActionButton(
-                  onTap: () => ref.read(gameProvider.notifier).useHint(),
-                  icon: Icons.lightbulb,
-                  label: 'HINT: ${state.hintsRemaining}',
-                  color: state.hintsRemaining > 0 ? Colors.blueAccent : Colors.redAccent,
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            // Combo Badge
-            if (state.comboCount > 1)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Colors.orange, Colors.redAccent]),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.3), blurRadius: 8)],
-                ),
-                child: Text(
-                  'x${state.comboCount}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                ),
-              ).animate().scale().shimmer(),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1059,40 +1080,54 @@ extension GameScreenActions on _GameScreenState {
 class _ActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final IconData icon;
-  final String? label;
   final Color color;
+  final bool isFilled;
+  final int? badgeNumber;
 
   const _ActionButton({
     required this.onTap,
     required this.icon,
-    this.label,
     required this.color,
+    this.isFilled = false,
+    this.badgeNumber,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isFilled ? color.withOpacity(isDark ? 0.2 : 0.1) : (isDark ? const Color(0xFF1E1E1E) : Colors.white);
+
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color, width: 1.5),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 20),
-            if (label != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                label!,
-                style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bgColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withOpacity(isDark ? 0.6 : 0.3), width: 1.5),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          if (badgeNumber != null && badgeNumber! > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$badgeNumber',
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
               ),
-            ],
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

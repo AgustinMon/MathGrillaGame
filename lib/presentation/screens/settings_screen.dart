@@ -5,11 +5,30 @@ import '../../core/theme/app_theme.dart';
 import '../providers/game_provider.dart';
 import '../providers/settings_provider.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  late TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: ref.read(settingsProvider).playerName);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
 
@@ -22,6 +41,24 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          _buildSection(context, 'Perfil'),
+          ListTile(
+            title: const Text('Nombre de Jugador'),
+            subtitle: const Text('Se mostrará en tus estadísticas'),
+            trailing: SizedBox(
+              width: 150,
+              child: TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  hintText: 'Tu nombre',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                ),
+                onChanged: (val) => notifier.setPlayerName(val),
+              ),
+            ),
+          ),
+          
           _buildSection(context, 'Apariencia'),
           SwitchListTile(
             title: const Text('Modo Oscuro'),

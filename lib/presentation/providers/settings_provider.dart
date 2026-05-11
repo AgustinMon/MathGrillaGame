@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/translations.dart';
 
 class SettingsState {
@@ -10,6 +11,7 @@ class SettingsState {
   final String geography; // 'global', 'ue', 'usa'
   final bool? consentAccepted; // null = pendiente, true = aceptado, false = rechazado
   final bool scrollbarOnLeft;
+  final String playerName;
 
   SettingsState({
     required this.themeMode,
@@ -18,6 +20,7 @@ class SettingsState {
     this.geography = 'global',
     this.consentAccepted,
     this.scrollbarOnLeft = false,
+    this.playerName = '',
   });
 
   SettingsState copyWith({
@@ -27,6 +30,7 @@ class SettingsState {
     String? geography,
     bool? consentAccepted,
     bool? scrollbarOnLeft,
+    String? playerName,
     bool clearConsent = false,
   }) {
     return SettingsState(
@@ -36,6 +40,7 @@ class SettingsState {
       geography: geography ?? this.geography,
       consentAccepted: clearConsent ? null : (consentAccepted ?? this.consentAccepted),
       scrollbarOnLeft: scrollbarOnLeft ?? this.scrollbarOnLeft,
+      playerName: playerName ?? this.playerName,
     );
   }
 }
@@ -46,7 +51,17 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     locale: PlatformDispatcher.instance.locale.languageCode == 'es' 
         ? const Locale('es') 
         : const Locale('en'),
-  ));
+  )) {
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('playerName') ?? '';
+    if (name.isNotEmpty) {
+      state = state.copyWith(playerName: name);
+    }
+  }
 
   void toggleTheme() {
     state = state.copyWith(
@@ -76,6 +91,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
   void setScrollbarOnLeft(bool value) {
     state = state.copyWith(scrollbarOnLeft: value);
+  }
+
+  void setPlayerName(String name) async {
+    state = state.copyWith(playerName: name);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('playerName', name);
   }
 }
 

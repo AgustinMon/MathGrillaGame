@@ -14,9 +14,56 @@ class MathEngine {
 
   /// Carga los niveles pre-diseñados desde los archivos JSON de assets.
   static Future<void> loadLevels() async {
-    // Desactivamos la carga de niveles fijos para evitar números gigantes heredados de assets antiguos.
-    _levelsByDifficulty = {'easy': [], 'medium': [], 'hard': []};
-    debugPrint('✅ CRUCIMATH: Niveles fijos desactivados. Todo será procedural y controlado.');
+    try {
+      final easyData = await rootBundle.loadString('assets/levels_easy.json');
+      final mediumData = await rootBundle.loadString('assets/levels_medium.json');
+      final hardData = await rootBundle.loadString('assets/levels_hard.json');
+
+      _levelsByDifficulty['easy'] = _parseAndFilter(easyData);
+      _levelsByDifficulty['medium'] = _parseAndFilter(mediumData);
+      _levelsByDifficulty['hard'] = _parseAndFilter(hardData);
+
+      debugPrint('✅ CRUCIMATH: Niveles fijos cargados y filtrados (máx 3 cifras).');
+    } catch (e) {
+      debugPrint('❌ Error cargando niveles: $e');
+    }
+  }
+
+  static List<PuzzleLevel> _parseAndFilter(String jsonData) {
+    if (jsonData.isEmpty) return [];
+    try {
+      final decoded = json.decode(jsonData);
+      if (decoded == null || decoded is! List) return [];
+      
+      final list = decoded as List;
+      List<PuzzleLevel> filtered = [];
+      
+      for (var l in list) {
+        if (l == null || l is! Map) continue;
+        
+        bool hasLargeNum = false;
+        var cellsList = l['cells'];
+        if (cellsList == null || cellsList is! List) continue;
+        
+        for (var cell in cellsList) {
+          if (cell == null || cell is! Map) continue;
+          if (cell['type'] == 1) { // Number
+            int? val = int.tryParse(cell['value']?.toString() ?? '');
+            if (val != null && (val > 999 || val < -999)) {
+              hasLargeNum = true;
+              break;
+            }
+          }
+        }
+        if (!hasLargeNum) {
+          filtered.add(PuzzleLevel.fromJson(Map<String, dynamic>.from(l)));
+        }
+      }
+      return filtered;
+    } catch (e) {
+      debugPrint('⚠️ Error parseando JSON de niveles: $e');
+      return [];
+    }
   }
 
   /// Retorna la cantidad de niveles disponibles para una dificultad.
@@ -343,10 +390,10 @@ class MathEngine {
   }) {
     CellType type = _getCellType(val);
     
-    // FILTRO DE SEGURIDAD ABSOLUTO: Si por algún motivo llega un número > 999, abortamos la celda.
     if (type == CellType.number) {
       int? numVal = int.tryParse(val);
-      if (numVal != null && (numVal > 999 || numVal < 0)) return;
+      // Filtro de 3 cifras solicitado por el usuario
+      if (numVal != null && (numVal > 999 || numVal < -999)) return;
     }
 
     bool shouldBeFixed = false;

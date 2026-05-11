@@ -79,10 +79,7 @@ flutter:
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
-  fonts:
-    - family: Luckiest Guy
-      fonts:
-        - asset: assets/fonts/LuckiestGuy-Regular.ttf
+
 
 flutter_launcher_icons:
   android: "ic_launcher"

@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/puzzle_level.dart';
 import '../../domain/entities/medal.dart';
 import '../../domain/use_cases/math_engine.dart';
 import '../../data/repositories/medal_repository.dart';
+import '../../data/repositories/stats_repository.dart';
 import '../../core/utils/sound_service.dart';
 
 /// Representa el estado actual del juego en un momento dado.
@@ -238,6 +240,122 @@ class GameNotifier extends StateNotifier<GameState> {
     );
     _startTimer();
     _checkWinCondition();
+    StatsRepository().incrementGamesPlayed();
+  }
+
+  /// Carga un nivel personalizado creado desde el editor con lógica inteligente.
+  void loadCustomLevel(PuzzleLevel customLevel) {
+    List<GridCell> playableCells = List.from(customLevel.cells);
+    List<String> footer = [];
+    
+    // 1. Identificar todas las ecuaciones (secuencias de 5 celdas)
+    List<List<int>> equationIndices = [];
+    int size = customLevel.size;
+
+    // Horizontales
+    for (int y = 0; y < size; y++) {
+      for (int x = 0; x <= size - 5; x++) {
+        bool isEq = true;
+        List<int> indices = [];
+        for (int i = 0; i < 5; i++) {
+          int idx = playableCells.indexWhere((c) => c.x == x + i && c.y == y);
+          if (idx == -1 || playableCells[idx].type == CellType.empty) { isEq = false; break; }
+          indices.add(idx);
+        }
+        if (isEq && playableCells[indices[3]].value == '=') equationIndices.add(indices);
+      }
+    }
+    // Verticales
+    for (int x = 0; x < size; x++) {
+      for (int y = 0; y <= size - 5; y++) {
+        bool isEq = true;
+        List<int> indices = [];
+        for (int i = 0; i < 5; i++) {
+          int idx = playableCells.indexWhere((c) => c.x == x && c.y == y + i);
+          if (idx == -1 || playableCells[idx].type == CellType.empty) { isEq = false; break; }
+          indices.add(idx);
+        }
+        if (isEq && playableCells[indices[3]].value == '=') equationIndices.add(indices);
+      }
+    }
+
+    // 2. Decidir qué celdas se quedan (fijas)
+    Set<int> fixedIndices = {};
+    
+    // Los signos siempre se quedan
+    for (int i = 0; i < playableCells.length; i++) {
+      if (playableCells[i].type == CellType.operator || playableCells[i].type == CellType.equals) {
+        fixedIndices.add(i);
+      }
+    }
+
+    // De cada ecuación, dejamos SOLO el RESULTADO (índice 4) pero solo para el 50% de las ecuaciones
+    // para dar un anclaje mínimo. El resto va al inventario.
+    final random = Random();
+    int resultsKept = 0;
+    for (var eq in equationIndices) {
+      if (resultsKept < 2 && random.nextDouble() < 0.5) {
+        fixedIndices.add(eq[4]);
+        resultsKept++;
+      }
+    }
+
+    // Si no quedó ningún resultado (grilla muy pequeña), forzamos uno
+    if (fixedIndices.where((i) => playableCells[i].type != CellType.operator && playableCells[i].type != CellType.equals).isEmpty && equationIndices.isNotEmpty) {
+      fixedIndices.add(equationIndices[0][4]);
+    }
+
+    // 3. Procesar todas las celdas según la decisión
+    List<GridCell> finalCells = [];
+    for (int i = 0; i < playableCells.length; i++) {
+      var cell = playableCells[i];
+      if (cell.type == CellType.empty) {
+        finalCells.add(cell);
+      } else if (fixedIndices.contains(i)) {
+        finalCells.add(cell);
+      } else {
+        // Al inventario
+        footer.add(cell.value!);
+        finalCells.add(GridCell(
+          x: cell.x,
+          y: cell.y,
+          type: cell.type,
+          value: cell.value,
+          currentValue: null,
+          isFixed: false,
+          isHorizontal: cell.isHorizontal,
+        ));
+      }
+    }
+
+    footer.shuffle();
+
+    state = state.copyWith(
+      currentLevel: PuzzleLevel(
+        id: customLevel.id,
+        size: customLevel.size,
+        cells: finalCells,
+        footerTiles: footer,
+        machineTiles: customLevel.machineTiles,
+      ),
+      levelNumber: 0,
+      timeLeft: 0,
+      isTimerCountDown: false,
+      isLevelComplete: false,
+      isGameOver: false,
+      lives: 3,
+      solvedCells: {},
+      solvedRows: {},
+      solvedCols: {},
+      message: '¡Nivel Personalizado!',
+      hintsRemaining: 1, // Menos pistas para niveles personalizados pequeños
+      isTimerPaused: false,
+      machineInputA: null,
+      machineInputB: null,
+      machineOp: '+',
+      comboCount: 0,
+    );
+    _startTimer();
   }
 
   /// Inicia el desafío diario (un nivel fijo para el día actual).
@@ -482,9 +600,12 @@ class GameNotifier extends StateNotifier<GameState> {
           final diff = now.difference(state.lastSolveTime!).inSeconds;
           if (diff < 10) { // Si resuelve en menos de 10s, combo!
             newCombo = state.comboCount + 1;
+            if (newCombo > 3) newCombo = 3; // Límite máximo de x3
             points *= newCombo;
           }
         }
+        
+        StatsRepository().updateBestCombo(newCombo);
 
         if (isHorizontal) {
           state = state.copyWith(
@@ -507,6 +628,7 @@ class GameNotifier extends StateNotifier<GameState> {
             timeLeft: state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
           );
         }
+        HapticFeedback.mediumImpact();
         SoundService.playSuccess();
       } else {
         // Si el cálculo es incorrecto
@@ -594,9 +716,13 @@ class GameNotifier extends StateNotifier<GameState> {
       _timer?.cancel();
       SoundService.playWin();
       _checkMedals();
+      final finalScore = state.score + (state.levelNumber * 50) + (state.timeLeft * 2);
+      StatsRepository().incrementGamesWon();
+      StatsRepository().addScore(finalScore);
+      
       state = state.copyWith(
         isLevelComplete: true,
-        score: state.score + (state.levelNumber * 50) + (state.timeLeft * 2),
+        score: finalScore,
         message: '¡Nivel Completado!',
       );
     } else if (gridFull && footerEmpty && !allGridCorrect) {
@@ -628,12 +754,49 @@ class GameNotifier extends StateNotifier<GameState> {
     return false;
   }
 
-  /// Verifica que cada celda contenga exactamente el valor pensado para esa posición.
-  bool _isExactMatch(List<GridCell> cells) {
-    return cells.every((c) {
-      final current = c.currentValue ?? (c.isFixed ? c.value : null);
-      return current == c.value;
-    });
+  /// Utiliza una pista para revelar una celda al azar.
+  void useHint() {
+    if (state.hintsRemaining <= 0 || state.currentLevel == null || state.isGameOver || state.isLevelComplete) return;
+
+    // Solo sugerimos pistas para celdas que no están fijas
+    // Y que NO forman parte de una ecuación ya resuelta matemáticamente.
+    final unsolvedCells = state.currentLevel!.cells.where((c) {
+      if (c.isFixed || c.type == CellType.empty) return false;
+      
+      // Si la celda está en solvedCells, significa que ya es parte de una ecuación válida.
+      // No deberíamos sugerir cambiarla incluso si no coincide con el 'value' original (variante).
+      return !state.solvedCells.contains('${c.x},${c.y}');
+    }).toList();
+
+    if (unsolvedCells.isEmpty) {
+      state = state.copyWith(message: '¡Todo lo colocado parece correcto!');
+      return;
+    }
+    
+    // De las celdas sin resolver, elegimos una al azar.
+    final target = unsolvedCells[Random().nextInt(unsolvedCells.length)];
+
+    if (target.value != null) {
+      // Al usar una pista, si el número estaba en el footer o máquina, deberíamos quitarlo.
+      final updatedFooter = List<String>.from(state.currentLevel!.footerTiles);
+      updatedFooter.remove(target.value);
+      
+      final updatedMachine = List<String>.from(state.machineTiles);
+      updatedMachine.remove(target.value);
+
+      state = state.copyWith(
+        currentLevel: PuzzleLevel(
+          id: state.currentLevel!.id,
+          size: state.currentLevel!.size,
+          cells: state.currentLevel!.cells,
+          footerTiles: updatedFooter,
+          machineTiles: updatedMachine,
+        ),
+        machineTiles: updatedMachine,
+      );
+      placeTile(target.x, target.y, target.value!);
+    }
+    state = state.copyWith(hintsRemaining: state.hintsRemaining - 1);
   }
 
   /// Helper para obtener una celda en coordenadas específicas, devolviendo una vacía si no existe.
@@ -657,42 +820,6 @@ class GameNotifier extends StateNotifier<GameState> {
   void skipLevel(int targetLevel) {
     _timer?.cancel();
     startNewLevel(targetLevel);
-  }
-
-  /// Utiliza una pista para revelar una celda al azar.
-  void useHint() {
-    if (state.hintsRemaining <= 0 || state.currentLevel == null || state.isGameOver || state.isLevelComplete) return;
-
-    final unsolvedCells = state.currentLevel!.cells.where((c) =>
-      !c.isFixed && (c.currentValue == null || c.currentValue != c.value)
-    ).toList();
-
-    if (unsolvedCells.isEmpty) return;
-    
-    final target = unsolvedCells[Random().nextInt(unsolvedCells.length)];
-
-    if (target.value != null) {
-      // Al usar una pista, si el número estaba en el footer o máquina, deberíamos quitarlo.
-      // Por simplicidad lo quitamos del footer si existe.
-      final updatedFooter = List<String>.from(state.currentLevel!.footerTiles);
-      updatedFooter.remove(target.value);
-      
-      final updatedMachine = List<String>.from(state.machineTiles);
-      updatedMachine.remove(target.value);
-
-      state = state.copyWith(
-        currentLevel: PuzzleLevel(
-          id: state.currentLevel!.id,
-          size: state.currentLevel!.size,
-          cells: state.currentLevel!.cells,
-          footerTiles: updatedFooter,
-          machineTiles: updatedMachine,
-        ),
-        machineTiles: updatedMachine,
-      );
-      placeTile(target.x, target.y, target.value!);
-    }
-    state = state.copyWith(hintsRemaining: state.hintsRemaining - 1);
   }
 
   /// Pausa o reanuda el tiempo.

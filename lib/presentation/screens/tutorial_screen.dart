@@ -1,13 +1,20 @@
+import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/theme/app_theme.dart';
+import '../../domain/entities/puzzle_level.dart';
+import '../providers/game_provider.dart';
+import '../providers/settings_provider.dart';
 import 'game_screen.dart';
 import 'settings_screen.dart';
 import 'medals_screen.dart';
-import '../../core/theme/app_theme.dart';
-import '../providers/game_provider.dart';
-import '../providers/settings_provider.dart';
+import 'explain_me_screen.dart';
+import 'level_editor_screen.dart';
+import 'stats_screen.dart';
 
 class TutorialScreen extends ConsumerStatefulWidget {
   const TutorialScreen({super.key});
@@ -35,22 +42,23 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
   void _showConsentDialog() {
     final settings = ref.read(settingsProvider);
     final isUE = settings.geography == 'ue';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.darkCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.primaryBlue, width: 2)),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          isUE ? 'Privacidad (GDPR - UE)' : 'Privacidad (CCPA - USA)',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          isUE ? 'Privacidad' : 'Privacy',
+          style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold),
         ),
         content: Text(
           isUE 
-            ? 'Para cumplir con las normas de la UE, necesitamos tu consentimiento para mostrarte anuncios personalizados.' 
-            : 'Para cumplir con las normas de USA, te informamos que recolectamos datos para mejorar tu experiencia.',
-          style: const TextStyle(color: Colors.white70),
+            ? 'Necesitamos tu consentimiento para mejorar la experiencia.' 
+            : 'We need your consent to improve the experience.',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
         ),
         actions: [
           TextButton(
@@ -58,15 +66,15 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
               ref.read(settingsProvider.notifier).setConsent(false);
               Navigator.pop(context);
             },
-            child: const Text('RECHAZAR', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('RECHAZAR', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
               ref.read(settingsProvider.notifier).setConsent(true);
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue),
-            child: const Text('ACEPTAR', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, elevation: 0),
+            child: const Text('ACEPTAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -76,130 +84,150 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
   @override
   Widget build(BuildContext context) {
     final difficulty = ref.watch(gameProvider).difficulty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     return Scaffold(
+      backgroundColor: scaffoldBg,
       body: Stack(
         children: [
-          // Fondo con degradado animado y patrón de cuadrícula
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.darkBg, const Color(0xFF1A1D2E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          // Fondo con círculos de color muy suaves
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withOpacity(isDark ? 0.03 : 0.05),
+                shape: BoxShape.circle,
               ),
             ),
           ),
-          
-          // Símbolos matemáticos flotantes de fondo repartidos por toda la pantalla
-          ...List.generate(15, (index) {
-            final symbols = ['+', '-', '×', '÷', '=', '%', '√'];
-            final screenSize = MediaQuery.of(context).size;
-            
-            // Distribución pseudo-aleatoria basada en el índice y tamaño de pantalla
-            final left = (index * 0.17 * screenSize.width) % screenSize.width;
-            final top = (index * 0.13 * screenSize.height) % screenSize.height;
-            final rotation = (index * 45).toDouble();
-            
-            return Positioned(
-              left: left,
-              top: top,
-              child: Transform.rotate(
-                angle: rotation * (3.14159 / 180),
-                child: Opacity(
-                  opacity: 0.04,
-                  child: Text(
-                    symbols[index % symbols.length],
-                    style: const TextStyle(
-                      fontSize: 80, 
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+          Positioned(
+            bottom: -50,
+            left: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: Colors.purple.withOpacity(isDark ? 0.02 : 0.04),
+                shape: BoxShape.circle,
               ),
-            ).animate(onPlay: (c) => c.repeat()).moveY(
-              begin: 0, end: 30, duration: (3000 + (index * 500) % 2000).ms, curve: Curves.easeInOut
-            ).then().moveY(begin: 30, end: 0);
-          }),
+            ),
+          ),
 
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
                 children: [
-                  const SizedBox(height: 20),
-                  // Botones de Ajustes y Medallas en la esquina
+                  const SizedBox(height: 16),
+                  // Header minimalista
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.emoji_events, color: Colors.amberAccent, size: 28),
-                        onPressed: () => Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (context) => MedalsScreen())
-                        ),
-                      ).animate().scale(delay: 200.ms, duration: 600.ms, curve: Curves.elasticOut),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.settings, color: Colors.white54, size: 28),
-                        onPressed: () => Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (context) => const SettingsScreen())
-                        ),
-                      ).animate().rotate(duration: 1000.ms, curve: Curves.easeInOut),
+                      _buildHeaderAction(Icons.insights_rounded, isDark ? Colors.cyanAccent : Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsScreen()))),
+                      const SizedBox(width: 12),
+                      _buildHeaderAction(Icons.emoji_events_outlined, Colors.amber[700]!, () => Navigator.push(context, MaterialPageRoute(builder: (_) => MedalsScreen()))),
+                      const SizedBox(width: 12),
+                      _buildHeaderAction(Icons.settings_outlined, isDark ? Colors.white70 : Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
                     ],
                   ),
-                  
-                  const Spacer(),
-                  
-                  // Título con estilo de juego
+
+                  const Spacer(flex: 1),
+
+                  // Logo / Título
                   Column(
                     children: [
-                      Text(
-                        'CRUCI',
-                        style: GoogleFonts.roboto(
-                          fontSize: 64,
-                          fontWeight: FontWeight.w900,
-                          height: 0.8,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(color: AppTheme.primaryBlue.withOpacity(0.5), offset: const Offset(4, 4), blurRadius: 10),
+                      RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.outfit(
+                            fontSize: 52,
+                            letterSpacing: -1.5,
+                            color: primaryColor,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: 'Cruci ',
+                              style: TextStyle(fontWeight: FontWeight.w400),
+                            ),
+                            TextSpan(
+                              text: 'MATH',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: Colors.amber.shade600,
+                              ),
+                            ),
                           ],
                         ),
-                      ).animate().fadeIn(duration: 600.ms).scale(begin: const Offset(0.5, 0.5)),
+                      ).animate().fadeIn(duration: 800.ms).scale(begin: const Offset(0.95, 0.95)),
+                      const SizedBox(height: 8),
                       Text(
-                        'MATH',
-                        style: GoogleFonts.roboto(
-                          fontSize: 80,
-                          fontWeight: FontWeight.w900,
-                          height: 0.8,
-                          color: AppTheme.primaryBlue,
-                          shadows: [
-                            Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(6, 6), blurRadius: 10),
-                          ],
+                        'DESAFÍA TU MENTE',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 4,
+                          color: primaryColor.withOpacity(0.3),
                         ),
-                      ).animate().fadeIn(duration: 800.ms, delay: 200.ms).scale(begin: const Offset(0.5, 0.5)),
+                      ).animate().fadeIn(delay: 400.ms),
                     ],
                   ),
-                  
-                  const SizedBox(height: 60),
-                  
-                  // Selector de Dificultad mejorado
-                  _buildDifficultySelector(difficulty),
+
+                  const Spacer(flex: 1),
+
+                  // Selector de Dificultad
+                  _buildThemedDifficultySelector(difficulty, isDark, cardBg),
 
                   const SizedBox(height: 40),
-                  
-                  // Botón Jugar Premium
-                  _buildPlayButton(context),
 
-                  const SizedBox(height: 20),
+                  // Botón PLAY
+                  _buildPremiumPlayButton(context),
+
+                  const SizedBox(height: 24),
+
+                  // Acciones secundarias
+                  _buildThemedCardAction(
+                    'JUEGO DEL DÍA', 
+                    Icons.calendar_today_rounded, 
+                    const Color(0xFFF59E0B), 
+                    cardBg,
+                    isDark,
+                    () {
+                      ref.read(gameProvider.notifier).startDailyChallenge();
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GameScreen()));
+                    }
+                  ),
                   
-                  // Botón Juego del Día
-                  _buildDailyChallengeButton(context),
-                  
+                  const SizedBox(height: 12),
+
+                  _buildThemedCardAction(
+                    'MIS GRILLAS', 
+                    Icons.auto_awesome_motion_rounded, 
+                    const Color(0xFF8B5CF6), 
+                    cardBg,
+                    isDark,
+                    () => _showMyGridsList(context)
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Modos Inferiores
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSimpleModeButton('Explícame', Icons.psychology_outlined, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExplainMeScreen()))),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildSimpleModeButton('Editor', Icons.edit_rounded, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelEditorScreen()))),
+                      ),
+                    ],
+                  ),
+
                   const Spacer(flex: 2),
                 ],
               ),
@@ -210,37 +238,47 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     );
   }
 
-  Widget _buildDifficultySelector(String currentDifficulty) {
+  Widget _buildHeaderAction(IconData icon, Color color, VoidCallback onTap) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, color: color.withOpacity(0.7), size: 26),
+      constraints: const BoxConstraints(),
+      padding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _buildThemedDifficultySelector(String current, bool isDark, Color cardBg) {
     return Container(
-      padding: const EdgeInsets.all(6),
+      height: 48,
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
       child: Row(
         children: ['easy', 'medium', 'hard'].map((d) {
-          final isSelected = currentDifficulty == d;
+          final isSelected = current == d;
           return Expanded(
             child: GestureDetector(
               onTap: () => ref.read(gameProvider.notifier).changeDifficulty(d),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+              child: AnimatedContainer(
+                duration: 250.ms,
                 decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.primaryBlue : Colors.transparent,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: isSelected ? [
-                    BoxShadow(color: AppTheme.primaryBlue.withOpacity(0.3), blurRadius: 10, spreadRadius: 1)
-                  ] : [],
+                  color: isSelected ? (isDark ? Colors.white : const Color(0xFF0F172A)) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  d.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isSelected ? Colors.black87 : Colors.white54,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    letterSpacing: 1.2,
+                child: Center(
+                  child: Text(
+                    d.toUpperCase(),
+                    style: TextStyle(
+                      color: isSelected ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white38 : Colors.black38),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                      letterSpacing: 1.0,
+                    ),
                   ),
                 ),
               ),
@@ -248,80 +286,156 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
           );
         }).toList(),
       ),
-    ).animate(delay: 1000.ms).fadeIn().moveY(begin: 30);
+    );
   }
 
-  Widget _buildPlayButton(BuildContext context) {
+  Widget _buildPremiumPlayButton(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const GameScreen()),
-      ),
+      onTap: () {
+        ref.read(gameProvider.notifier).startNewLevel(1);
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GameScreen()));
+      },
       child: Container(
         width: double.infinity,
-        height: 70,
+        height: 72,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(35),
-          gradient: const LinearGradient(
-            colors: [AppTheme.primaryBlue, Color(0xFF0088FF)],
+          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            colors: [Colors.amber.shade400, Colors.amber.shade600],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
           boxShadow: [
-            BoxShadow(color: AppTheme.primaryBlue.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10)),
+            BoxShadow(
+              color: Colors.amber.shade600.withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
           ],
         ),
         child: const Center(
           child: Text(
-            '¡A JUGAR!',
+            'JUGAR AHORA',
             style: TextStyle(
-              fontFamily: 'Luckiest Guy',
-              fontSize: 28,
-              color: Colors.white,
-              letterSpacing: 2,
+              color: Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
             ),
           ),
         ),
       ),
-    ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 2000.ms, color: Colors.white24)
-     .animate(delay: 1500.ms).fadeIn().moveY(begin: 50);
+    ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 2500.ms, color: Colors.white12);
   }
 
-  Widget _buildDailyChallengeButton(BuildContext context) {
+  Widget _buildThemedCardAction(String label, IconData icon, Color color, Color cardBg, bool isDark, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () {
-        ref.read(gameProvider.notifier).startDailyChallenge();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const GameScreen()),
-        );
-      },
+      onTap: onTap,
       child: Container(
-        width: double.infinity,
-        height: 60,
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          color: Colors.white.withOpacity(0.1),
-          border: Border.all(color: Colors.amberAccent.withOpacity(0.5), width: 1.5),
+          color: cardBg,
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: Colors.amberAccent.withOpacity(0.1), blurRadius: 10),
+            BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.03), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.calendar_today, color: Colors.amberAccent, size: 24),
-            const SizedBox(width: 12),
-            const Text(
-              'JUEGO DEL DÍA',
-              style: TextStyle(
-                fontFamily: 'Luckiest Guy',
-                fontSize: 20,
-                color: Colors.amberAccent,
-                letterSpacing: 1.5,
-              ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF1E293B), fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.5),
+            ),
+            const Spacer(),
+            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white12 : Colors.black12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleModeButton(String label, IconData icon, Color color, VoidCallback onTap) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      style: TextButton.styleFrom(
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+
+  void _showMyGridsList(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? gridsJson = prefs.getString('my_custom_grids');
+    final List<dynamic> savedGrids = gridsJson != null ? json.decode(gridsJson) : [];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(32),
+        height: 500,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('MIS GRILLAS', style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 24),
+            Expanded(
+              child: savedGrids.isEmpty
+                ? Center(child: Text('No tienes grillas guardadas.', style: TextStyle(color: isDark ? Colors.white24 : Colors.black26)))
+                : ListView.builder(
+                    itemCount: savedGrids.length,
+                    itemBuilder: (context, i) {
+                      final g = savedGrids[i];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                          leading: const Icon(Icons.grid_on_rounded, color: Color(0xFF8B5CF6)),
+                          title: Text('Grilla ${g['width']}x${g['height']}', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+                          trailing: const Icon(Icons.play_arrow_rounded, color: Color(0xFF10B981), size: 30),
+                          onTap: () {
+                            final List<GridCell> levelCells = (g['cells'] as List).map((c) => GridCell(
+                              x: c['x'],
+                              y: c['y'],
+                              type: CellType.values[c['type']],
+                              value: c['value'],
+                              isFixed: c['isFixed'] ?? true,
+                            )).toList();
+                            final customLevel = PuzzleLevel(
+                              id: g['id'],
+                              size: g['width'] > g['height'] ? g['width'] : g['height'],
+                              cells: levelCells,
+                              footerTiles: [],
+                            );
+                            ref.read(gameProvider.notifier).loadCustomLevel(customLevel);
+                            Navigator.pop(context);
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GameScreen()));
+                          },
+                        ),
+                      );
+                    },
+                  ),
             ),
           ],
         ),
       ),
-    ).animate().fadeIn(delay: 1200.ms).slideX(begin: -0.1);
+    );
   }
 }
