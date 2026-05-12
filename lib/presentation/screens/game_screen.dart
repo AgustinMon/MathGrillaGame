@@ -465,6 +465,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   Widget _buildCell(GridCell cell, GameState state, WidgetRef ref, Translations l10n, double cellSize) {
     // Verificamos si esta celda es parte de una ecuación ya resuelta.
     final isSolved = state.solvedCells.contains('${cell.x},${cell.y}');
+    final isMathOnly = state.mathOnlyCells.contains('${cell.x},${cell.y}');
 
     return DragTarget<Map<String, dynamic>>(
       onAcceptWithDetails: (details) {
@@ -496,7 +497,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           child: MathTile(
             value: cell.currentValue ?? (cell.isFixed ? cell.value! : ''),
             size: cellSize,
-            color: isSolved ? Colors.green : (cell.isFixed ? null : Colors.blueAccent),
+            color: isSolved ? Colors.green : (isMathOnly ? Colors.yellow.shade700 : (cell.isFixed ? null : Colors.blueAccent)),
             animateOnEntry: cell.currentValue != null,
           ),
         );

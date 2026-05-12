@@ -85,17 +85,16 @@ class MathEngine {
     }
 
     // Fallback procedural con lógica escalada
-    int size = 7; 
-    if (difficulty == 'medium') size = 13; // Más grande para permitir más cruces
-    if (difficulty == 'hard') size = 18;
+    int size = 5; 
+    if (difficulty == 'medium') size = 11;
+    if (difficulty == 'hard') size = 16;
 
-    if (levelId >= 15) {
-      size = (size * 1.4).toInt();
-    } else if (levelId >= 8) {
-      size = (size * 1.2).toInt();
-    }
-    size = size.clamp(7, 35);
-    size = size.clamp(7, 30);
+    int increment = levelId ~/ 20; // Aumenta 1 de tamaño cada 20 niveles aprox
+    size += increment;
+
+    if (difficulty == 'easy') size = size.clamp(5, 10);
+    else if (difficulty == 'medium') size = size.clamp(11, 15);
+    else if (difficulty == 'hard') size = size.clamp(16, 20);
 
     // Intentamos generar un nivel con la densidad deseada.
     // Solo permitimos intersecciones para garantizar que todo esté conectado.
@@ -207,21 +206,27 @@ class MathEngine {
     // Decidimos qué números serán fijos ANTES de crear las celdas para asegurar que al menos uno vaya al footer.
     List<int> numberIndices = [0, 2, 4];
     List<int> fixedIndices = [];
-    double fixedProb = (difficulty == 'easy') ? 0.3 : (difficulty == 'medium' ? 0.2 : 0.1);
+    double fixedProb = (difficulty == 'easy') ? 0.4 : (difficulty == 'medium' ? 0.35 : 0.3);
     
     for (int idx in numberIndices) {
-      if (_random.nextDouble() < fixedProb) {
+      double prob = fixedProb;
+      if (idx == 4) prob += 0.1; // Ligeramente más probable que el resultado sea fijo (ayuda a la deducción)
+      if (_random.nextDouble() < prob) {
         fixedIndices.add(idx);
       }
     }
     
     // Regla de Oro: Nunca fijar los 3 números de una ecuación.
-    // En Medium/Hard, máximo 1 número fijo por ecuación nueva.
-    int maxFixed = (difficulty == 'easy') ? 2 : 1;
+    // Para asegurar deducción, permitimos hasta 2 fijos en fácil/medio, y 1 o 2 en difícil.
+    int maxFixed = (difficulty == 'hard') ? 1 : 2;
+    // Si es la primera operación del tablero, aseguremos al menos 1 fijo para arrancar
+    if (fixedIndices.isEmpty && cells.isEmpty) {
+      fixedIndices.add([0, 2, 4][_random.nextInt(3)]);
+    }
+
     while (fixedIndices.length > maxFixed) {
       fixedIndices.removeAt(_random.nextInt(fixedIndices.length));
     }
-    // Asegurar al menos uno NO fijo siempre
     if (fixedIndices.length >= 3) fixedIndices.removeAt(0);
 
     for (int i = 0; i < parts.length; i++) {
@@ -295,10 +300,12 @@ class MathEngine {
       
       List<int> fixedIndices = [];
       // La intersección ya tiene su estado (fijo o no), así que solo decidimos para los otros 2.
-      double fixedProb = (difficulty == 'easy') ? 0.25 : (difficulty == 'medium' ? 0.15 : 0.05);
+      double fixedProb = (difficulty == 'easy') ? 0.35 : (difficulty == 'medium' ? 0.3 : 0.25);
       
       for (int idx in otherIndices) {
-        if (_random.nextDouble() < fixedProb) fixedIndices.add(idx);
+        double prob = fixedProb;
+        if (idx == 4) prob += 0.1;
+        if (_random.nextDouble() < prob) fixedIndices.add(idx);
       }
 
       // Verificamos si la intersección ya es fija
@@ -306,7 +313,7 @@ class MathEngine {
       int totalFixedInEq = fixedIndices.length + (existingIntersect.isFixed ? 1 : 0);
       
       // Aplicamos límites de dificultad
-      int maxFixed = (difficulty == 'easy') ? 2 : 1;
+      int maxFixed = (difficulty == 'hard') ? 1 : 2;
       while (totalFixedInEq > maxFixed && fixedIndices.isNotEmpty) {
         fixedIndices.removeAt(0);
         totalFixedInEq--;

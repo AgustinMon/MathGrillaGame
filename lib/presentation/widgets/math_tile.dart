@@ -68,6 +68,9 @@ class MathTile extends ConsumerWidget {
       // Si explícitamente se pasa un color verde de resuelto, podemos teñir suavemente
       if (color == Colors.green) {
         bgColor = isDark ? const Color(0xFF1B5E20) : const Color(0xFFE8F5E9); // Verde muy suave
+      } else if (color == Colors.yellow.shade700) {
+        bgColor = isDark ? const Color(0xFF5A4A00) : const Color(0xFFFFF9C4); // Amarillo oscuro suave
+        borderColor = isDark ? Colors.amber.shade700 : Colors.amber.shade900;
       }
     }
 

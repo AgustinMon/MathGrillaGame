@@ -11,6 +11,12 @@ import '../../data/repositories/medal_repository.dart';
 import '../../data/repositories/stats_repository.dart';
 import '../../core/utils/sound_service.dart';
 
+enum ValidationResult {
+  match,
+  mathOnly,
+  wrong,
+}
+
 /// Representa el estado actual del juego en un momento dado.
 class GameState {
   final PuzzleLevel? currentLevel; // El nivel que se está jugando actualmente.
@@ -21,6 +27,7 @@ class GameState {
   final bool isGameOver; // Indica si el jugador ha perdido.
   final bool isLevelComplete; // Indica si el jugador ha ganado el nivel actual.
   final Set<String> solvedCells; // Celdas que forman parte de una ecuación correcta (formato "x,y").
+  final Set<String> mathOnlyCells; // Celdas que forman parte de una ecuación matemáticamente correcta pero incorrecta para el puzzle.
   final Set<int> solvedRows; // Filas que han sido completadas correctamente.
   final Set<int> solvedCols; // Columnas que han sido completadas correctamente.
   final List<Medal> medals; // Lista de medallas/logros del jugador.
@@ -58,6 +65,7 @@ class GameState {
     this.isGameOver = false,
     this.isLevelComplete = false,
     this.solvedCells = const {},
+    this.mathOnlyCells = const {},
     this.solvedRows = const {},
     this.solvedCols = const {},
     this.medals = const [],
@@ -97,6 +105,7 @@ class GameState {
     bool? isGameOver,
     bool? isLevelComplete,
     Set<String>? solvedCells,
+    Set<String>? mathOnlyCells,
     Set<int>? solvedRows,
     Set<int>? solvedCols,
     List<Medal>? medals,
@@ -137,6 +146,7 @@ class GameState {
       isGameOver: isGameOver ?? this.isGameOver,
       isLevelComplete: isLevelComplete ?? this.isLevelComplete,
       solvedCells: solvedCells ?? this.solvedCells,
+      mathOnlyCells: mathOnlyCells ?? this.mathOnlyCells,
       solvedRows: solvedRows ?? this.solvedRows,
       solvedCols: solvedCols ?? this.solvedCols,
       medals: medals ?? this.medals,
@@ -585,13 +595,14 @@ class GameNotifier extends StateNotifier<GameState> {
 
       if (valA == null || op == null || valB == null || valRes == null) return;
 
-      final bool isMathCorrect = _isMathCorrect(cells);
+      final ValidationResult validation = _validateMathAndPuzzle(cells);
       final newSolvedCells = Set<String>.from(state.solvedCells);
-      for (var c in cells) {
-        newSolvedCells.add('${c.x},${c.y}');
-      }
-
-      if (isMathCorrect) {
+      
+      if (validation == ValidationResult.match) {
+        for (var c in cells) {
+          newSolvedCells.add('${c.x},${c.y}');
+        }
+        
         final now = DateTime.now();
         int points = 100;
         int newCombo = 1;
@@ -634,8 +645,17 @@ class GameNotifier extends StateNotifier<GameState> {
 
         HapticFeedback.mediumImpact();
         SoundService.playSuccess();
+      } else if (validation == ValidationResult.mathOnly) {
+        // Matemáticamente correcto, pero la ubicación es incorrecta para resolver el puzzle.
+        // Solo lo añadimos a mathOnlyCells (que crearemos en el estado) para colorearlo distinto.
+        final newMathOnlyCells = Set<String>.from(state.mathOnlyCells);
+        for (var c in cells) {
+          newMathOnlyCells.add('${c.x},${c.y}');
+        }
+        state = state.copyWith(mathOnlyCells: newMathOnlyCells);
+        // No descontamos vida, ni damos puntos.
       } else {
-        // Si el cálculo es incorrecto
+        // ValidationResult.wrong
         if (state.lives > 0) {
           state = state.copyWith(
             lives: state.lives - 1,
@@ -643,7 +663,7 @@ class GameNotifier extends StateNotifier<GameState> {
             errorTrigger: state.errorTrigger + 1,
             lifeLostTrigger: state.lifeLostTrigger + 1,
             comboCount: 0, // Reset combo on error
-            message: 'Algo no está bien...',
+            // Removemos mathOnlyCells de las celdas actuales si se equivocó
           );
           SoundService.playError();
           if (state.lives == 0) {
@@ -757,27 +777,46 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
-  bool _isMathCorrect(List<GridCell> cells) {
-    if (cells.length < 5) return false;
+  ValidationResult _validateMathAndPuzzle(List<GridCell> cells) {
+    if (cells.length < 5) return ValidationResult.wrong;
     // Extraemos valores asegurándonos de usar currentValue si existe, o value si es fijo.
     final valAStr = cells[0].currentValue ?? (cells[0].isFixed ? cells[0].value : null);
     final op = cells[1].currentValue ?? (cells[1].isFixed ? cells[1].value : null);
     final valBStr = cells[2].currentValue ?? (cells[2].isFixed ? cells[2].value : null);
     final valResStr = cells[4].currentValue ?? (cells[4].isFixed ? cells[4].value : null);
 
-    if (valAStr == null || op == null || valBStr == null || valResStr == null) return false;
+    if (valAStr == null || op == null || valBStr == null || valResStr == null) return ValidationResult.wrong;
 
     final valA = int.tryParse(valAStr);
     final valB = int.tryParse(valBStr);
     final valRes = int.tryParse(valResStr);
 
-    if (valA == null || valB == null || valRes == null) return false;
+    if (valA == null || valB == null || valRes == null) return ValidationResult.wrong;
 
-    if (op == '+') return valA + valB == valRes;
-    if (op == '-') return valA - valB == valRes;
-    if (op == '*') return valA * valB == valRes;
-    if (op == '/') return valB != 0 && valA / valB == valRes;
-    return false;
+    bool isMathCorrect = false;
+    if (op == '+') isMathCorrect = valA + valB == valRes;
+    else if (op == '-') isMathCorrect = valA - valB == valRes;
+    else if (op == '*') isMathCorrect = valA * valB == valRes;
+    else if (op == '/') isMathCorrect = valB != 0 && valA / valB == valRes;
+
+    if (!isMathCorrect) return ValidationResult.wrong;
+
+    bool isPuzzleCorrect = true;
+    for (var c in cells) {
+      if (c.type == CellType.empty) continue;
+      final current = c.currentValue ?? (c.isFixed ? c.value : null);
+      if (current != c.value) {
+        isPuzzleCorrect = false;
+        break;
+      }
+    }
+
+    return isPuzzleCorrect ? ValidationResult.match : ValidationResult.mathOnly;
+  }
+
+  /// Verifica si una secuencia es matemáticamente correcta
+  bool _isMathCorrect(List<GridCell> cells) {
+    return _validateMathAndPuzzle(cells) != ValidationResult.wrong;
   }
 
   /// Utiliza una pista para revelar una celda al azar.
