@@ -75,6 +75,9 @@ flutter:
     - assets/levels_easy.json
     - assets/levels_medium.json
     - assets/levels_hard.json
+    - assets/levels/easy/
+    - assets/levels/medium/
+    - assets/levels/hard/
     - assets/images/
 
   # An image asset can refer to one or more resolution-specific "variants", see

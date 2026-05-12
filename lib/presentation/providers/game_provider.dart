@@ -235,6 +235,7 @@ class GameNotifier extends StateNotifier<GameState> {
       isGameOver: false,
       lives: 3,
       solvedCells: {},
+      mathOnlyCells: {}, // RESET EXPLICIT
       solvedRows: {},
       solvedCols: {},
       message: null,
@@ -247,6 +248,7 @@ class GameNotifier extends StateNotifier<GameState> {
       machineInputAFromMachine: false,
       machineInputBFromMachine: false,
       comboCount: 0,
+      lastSolveTime: null,
     );
     _startTimer();
     _checkWinCondition();
@@ -299,20 +301,14 @@ class GameNotifier extends StateNotifier<GameState> {
       }
     }
 
-    // De cada ecuación, dejamos SOLO el RESULTADO (índice 4) pero solo para el 50% de las ecuaciones
-    // para dar un anclaje mínimo. El resto va al inventario.
+    // De cada ecuación, dejamos el RESULTADO (índice 4) y ocasionalmente un operando
+    // para facilitar la resolución en niveles diseñados manualmente.
     final random = Random();
-    int resultsKept = 0;
     for (var eq in equationIndices) {
-      if (resultsKept < 2 && random.nextDouble() < 0.5) {
-        fixedIndices.add(eq[4]);
-        resultsKept++;
+      fixedIndices.add(eq[4]); // Siempre dejamos el resultado
+      if (random.nextDouble() < 0.3) {
+        fixedIndices.add(eq[0]); // Ocasionalmente el primer operando
       }
-    }
-
-    // Si no quedó ningún resultado (grilla muy pequeña), forzamos uno
-    if (fixedIndices.where((i) => playableCells[i].type != CellType.operator && playableCells[i].type != CellType.equals).isEmpty && equationIndices.isNotEmpty) {
-      fixedIndices.add(equationIndices[0][4]);
     }
 
     // 3. Procesar todas las celdas según la decisión
@@ -652,7 +648,11 @@ class GameNotifier extends StateNotifier<GameState> {
         for (var c in cells) {
           newMathOnlyCells.add('${c.x},${c.y}');
         }
-        state = state.copyWith(mathOnlyCells: newMathOnlyCells);
+        state = state.copyWith(
+          mathOnlyCells: newMathOnlyCells,
+          comboCount: 0,
+          lastSolveTime: null,
+        );
         // No descontamos vida, ni damos puntos.
       } else {
         // ValidationResult.wrong
@@ -663,7 +663,7 @@ class GameNotifier extends StateNotifier<GameState> {
             errorTrigger: state.errorTrigger + 1,
             lifeLostTrigger: state.lifeLostTrigger + 1,
             comboCount: 0, // Reset combo on error
-            // Removemos mathOnlyCells de las celdas actuales si se equivocó
+            lastSolveTime: null,
           );
           SoundService.playError();
           if (state.lives == 0) {

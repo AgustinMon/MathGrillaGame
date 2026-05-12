@@ -1,44 +1,59 @@
-# Criterios de Armado de Niveles (Crucimath)
+# Criterios de Armado y Lógica de Niveles (CruciMath)
 
-Este documento detalla la lógica interna utilizada por el motor de generación (`MathEngine` y `generate_levels.dart`) para crear los niveles del juego.
+Este documento detalla la lógica interna utilizada por el motor de generación procedural (`generator.py`) y el sistema de validación para garantizar una experiencia equilibrada, deductiva y de alta calidad.
 
-## 1. Tamaños de Tablero por Dificultad
-Los tamaños del crucigrama crecen progresivamente según el nivel actual del jugador dentro de cada categoría:
+## 1. Estructura y Densidad por Dificultad
 
-*   **Fácil (Easy):**
-    *   Rango de tamaño: `5x5` a `10x10`.
-    *   Incremento: +1 celda de tamaño cada 20 niveles.
-    *   Cantidad generada: 100 niveles.
-*   **Medio (Medium):**
-    *   Rango de tamaño: `11x11` a `15x15`.
-    *   Incremento: +1 celda de tamaño cada 70 niveles.
-    *   Cantidad generada: 350 niveles.
-*   **Difícil (Hard):**
-    *   Rango de tamaño: `16x16` a `20x20`.
-    *   Incremento: +1 celda de tamaño cada 40 niveles.
-    *   Cantidad generada: 200 niveles.
+Para garantizar que los niveles se sientan como verdaderos crucigramas y no como operaciones aisladas, se aplican restricciones estrictas de densidad y conectividad:
 
-## 2. Operaciones Matemáticas Permitidas
-*   **Niveles 1 a 5 (Tutorial y primer contacto):** Solo suma (`+`) y resta (`-`).
-*   **Nivel 6 en adelante:** Se introduce la multiplicación (`*`).
-*   **Nivel 11 en adelante:** Se introduce la división (`/`).
-*   *Nota:* En los modos Medio y Difícil, todas las operaciones están disponibles desde el nivel 1.
+| Dificultad | Tamaño Grilla | Cant. Ecuaciones | Densidad Mínima | Intersecciones Reales |
+| :--- | :--- | :--- | :--- | :--- |
+| **Fácil** | 5x5 | ≥ 4 | 60% | ≥ 30% |
+| **Medio** | 7x7 | ≥ 8 | 60% | ≥ 30% |
+| **Difícil** | 9x9 | ≥ 12 | 60% | ≥ 30% |
 
-## 3. Lógica de Pistas Fijas (Deducción vs Adivinanza)
-Para evitar que el jugador tenga que adivinar ("fuerza bruta") y fomentar la **deducción lógica**, el motor fija (pre-completa) un porcentaje de las celdas en el tablero.
+*   **Densidad**: Al menos el 60% de las celdas de la grilla deben estar ocupadas.
+*   **Intersecciones**: Al menos el 30% de las ecuaciones deben compartir un número con otra ecuación.
 
-*   **Porcentajes Base de Fijos:**
-    *   **Fácil:** ~40% de las celdas están fijas.
-    *   **Medio:** ~35% de las celdas están fijas.
-    *   **Difícil:** ~30% de las celdas están fijas.
-*   **Sesgo hacia Resultados:** Al momento de decidir qué celda dejar fija, el motor le otorga un **+10% extra de probabilidad a las celdas de resultado** (lo que está a la derecha del símbolo `=`). Esto garantiza que muchas ecuaciones revelen su meta (ej. `_ + _ = 15`), permitiendo resolver el crucigrama cruzando filas y columnas de manera deductiva.
-*   **Restricciones de Dificultad:**
-    *   Nunca se fijan los 3 números de una misma ecuación.
-    *   En niveles fáciles y medios, una ecuación nueva puede tener hasta 2 números fijos.
-    *   En niveles difíciles, una ecuación nueva tiene como máximo 1 número fijo.
+## 2. Motor Matemático y Reglas de Calidad
 
-## 4. Validación Estricta
-El juego evalúa no solo que una ecuación sea matemáticamente viable, sino que también corresponda al diseño original:
-*   **Acierto (Verde):** La matemática es correcta y las piezas colocadas son las que se designaron originalmente para ese espacio.
-*   **Coincidencia Parcial (Amarillo Oscuro):** La ecuación es matemáticamente correcta (ej. `2 + 3 = 5`), pero esas fichas estaban pensadas para otras intersecciones. La celda no da puntos, pero tampoco descuenta vidas, permitiendo al jugador darse cuenta de que "cuadra" la matemática pero no el crucigrama.
-*   **Error (Rojo):** La ecuación es matemáticamente incorrecta. El juego vibra, emite un sonido de error y resta una vida.
+Para evitar niveles triviales o repetitivos, el generador aplica las siguientes restricciones:
+
+### A. Restricciones de Operación
+*   **Prohibición de Dobles**: No se permiten operaciones de tipo `a + a` ni `a * a` (esta última solo en Easy/Medium).
+*   **Resultados Significativos**: En dificultades **Medio y Difícil**, todos los resultados deben ser **≥ 5**.
+*   **Sin Operaciones Nulas**: Se prohíben operaciones que resulten en 0 (ej. `a - a`).
+
+### B. Distribución de Operadores
+Cada dificultad tiene un "peso" específico para fomentar el uso de operaciones más complejas:
+
+| Dificultad | Suma (+) | Resta (-) | Multiplicación (×) | División (÷) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Fácil** | 50% | 30% | 15% | 5% |
+| **Medio** | 30% | 25% | 30% | 15% |
+| **Difícil** | 20% | 20% | 35% | 25% |
+
+### C. Variedad Numérica
+*   **Mínimo de Números Distintos**: Easy (≥ 5), Medium/Hard (≥ 6).
+*   **Límite de Repetición**: Ningún número puede representar más del **15%** del total de números del nivel (con un mínimo de 2 para permitir cruces).
+
+## 3. Garantía de Resolubilidad (Solvers)
+
+Cada nivel generado debe pasar por dos validadores automáticos antes de ser aceptado:
+
+### A. Solver Lógico (Deducibilidad)
+*   Simula el razonamiento humano paso a paso.
+*   **Regla del 15%**: Al menos el **85%** de los números ocultos deben ser deducibles lógicamente a partir de las celdas fijas y las ecuaciones que se van resolviendo. Solo se permite un máximo de 15% de "adivinanza" inicial.
+
+### B. Solver CSP (Unicidad)
+*   Verifica mediante backtracking que el conjunto de piezas en el inventario (footer) permita **exactamente una única solución** válida en la grilla.
+*   Si existe más de una forma de colocar los números que cumpla todas las ecuaciones, el nivel se descarta por ambiguo.
+
+## 4. Lógica de Celdas Fijas (Anclajes)
+*   Los operadores (+, -, *, /) y el signo igual (=) son **siempre fijos**.
+*   Los números tienen una probabilidad base de ser fijos, pero el sistema añade números fijos estratégicamente hasta que el nivel cumple con la **Regla del 15%** de deducibilidad.
+
+## 5. Estados de Validación en Juego
+*   **Verde (Match):** Matemática correcta + Posición correcta.
+*   **Amarillo (Math-Only):** Matemática correcta pero posición incorrecta en el puzzle.
+*   **Rojo (Error):** Matemática incorrecta. Resta una vida.

@@ -92,10 +92,24 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
   }
 
   Future<void> _saveGrid() async {
+    final l10n = ref.read(translationsProvider);
+    
+    // 1. Saneamiento: Eliminar operadores o iguales sueltos
+    _sanitizeGrid();
+
+    // 2. Validación: Chequear que haya al menos una ecuación válida
+    String? validationError = _validateGridIntegrity();
+    if (validationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(validationError),
+        backgroundColor: Colors.redAccent,
+      ));
+      return;
+    }
+
     // Recortar filas y columnas vacías en los extremos
     final nonEmptyCells = cells.where((c) => c.type != CellType.empty).toList();
     if (nonEmptyCells.isEmpty) {
-      final l10n = ref.read(translationsProvider);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.text('empty_grid_error'))));
       return;
     }
@@ -128,8 +142,101 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
     savedGrids.add(newGrid);
     await prefs.setString('my_custom_grids', json.encode(savedGrids));
     setState(() {});
-    final l10n = ref.read(translationsProvider);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.text('grid_saved_success'))));
+  }
+
+  void _sanitizeGrid() {
+    setState(() {
+      for (int i = 0; i < cells.length; i++) {
+        final cell = cells[i];
+        if (cell.type == CellType.operator || cell.type == CellType.equals) {
+          // Si es un operador o igual, debe tener vecinos
+          bool hasHorizontal = _isPartOfEquation(cell.x, cell.y, true);
+          bool hasVertical = _isPartOfEquation(cell.x, cell.y, false);
+          if (!hasHorizontal && !hasVertical) {
+            cells[i] = GridCell(x: cell.x, y: cell.y, type: CellType.empty);
+          }
+        }
+      }
+    });
+  }
+
+  bool _isPartOfEquation(int x, int y, bool horizontal) {
+    int count = 0;
+    if (horizontal) {
+      for (int i = -4; i <= 4; i++) {
+        final c = _getCellAt(x + i, y);
+        if (c != null && c.type != CellType.empty) {
+          count++;
+          if (count >= 3) return true;
+        } else {
+          count = 0;
+        }
+      }
+    } else {
+      for (int i = -4; i <= 4; i++) {
+        final c = _getCellAt(x, y + i);
+        if (c != null && c.type != CellType.empty) {
+          count++;
+          if (count >= 3) return true;
+        } else {
+          count = 0;
+        }
+      }
+    }
+    return false;
+  }
+
+  String? _validateGridIntegrity() {
+    final l10n = ref.read(translationsProvider);
+    bool hasEquation = false;
+    
+    for (int y = 0; y < gridHeight; y++) {
+      for (int x = 0; x < gridWidth; x++) {
+        if (_checkEquationAt(x, y, true) || _checkEquationAt(x, y, false)) {
+          hasEquation = true;
+          break;
+        }
+      }
+      if (hasEquation) break;
+    }
+
+    if (!hasEquation) return l10n.text('error_no_valid_equations');
+    return null;
+  }
+
+  bool _checkEquationAt(int x, int y, bool horizontal) {
+    if (horizontal) {
+      if (x > gridWidth - 5) return false;
+      final c1 = _getCellAt(x, y);
+      final c2 = _getCellAt(x + 1, y);
+      final c3 = _getCellAt(x + 2, y);
+      final c4 = _getCellAt(x + 3, y);
+      final c5 = _getCellAt(x + 4, y);
+      return _isValidSequence(c1, c2, c3, c4, c5);
+    } else {
+      if (y > gridHeight - 5) return false;
+      final c1 = _getCellAt(x, y);
+      final c2 = _getCellAt(x, y + 1);
+      final c3 = _getCellAt(x, y + 2);
+      final c4 = _getCellAt(x, y + 3);
+      final c5 = _getCellAt(x, y + 4);
+      return _isValidSequence(c1, c2, c3, c4, c5);
+    }
+  }
+
+  bool _isValidSequence(GridCell? c1, GridCell? c2, GridCell? c3, GridCell? c4, GridCell? c5) {
+    if (c1 == null || c2 == null || c3 == null || c4 == null || c5 == null) return false;
+    return c1.type == CellType.number &&
+           c2.type == CellType.operator &&
+           c3.type == CellType.number &&
+           c4.type == CellType.equals &&
+           c5.type == CellType.number;
+  }
+
+  GridCell? _getCellAt(int x, int y) {
+    if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) return null;
+    return cells[y * gridWidth + x];
   }
 
   void _onCellTap(int index) {
@@ -145,7 +252,52 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
           value: selectedValue,
           isFixed: true,
         );
+
+        if (selectedValue == "=") {
+          _tryAutoCalculate(old.x, old.y);
+        }
       }
+    });
+  }
+
+  void _tryAutoCalculate(int x, int y) {
+    final h1 = _getCellAt(x - 3, y);
+    final h2 = _getCellAt(x - 2, y);
+    final h3 = _getCellAt(x - 1, y);
+    if (h1?.type == CellType.number && h2?.type == CellType.operator && h3?.type == CellType.number) {
+      final res = _compute(h1!.value!, h2!.value!, h3!.value!);
+      if (res != null) _setCellAt(x + 1, y, CellType.number, res);
+    }
+
+    final v1 = _getCellAt(x, y - 3);
+    final v2 = _getCellAt(x, y - 2);
+    final v3 = _getCellAt(x, y - 1);
+    if (v1?.type == CellType.number && v2?.type == CellType.operator && v3?.type == CellType.number) {
+      final res = _compute(v1!.value!, v2!.value!, v3!.value!);
+      if (res != null) _setCellAt(x, y + 1, CellType.number, res);
+    }
+  }
+
+  String? _compute(String a, String op, String b) {
+    final n1 = int.tryParse(a);
+    final n2 = int.tryParse(b);
+    if (n1 == null || n2 == null) return null;
+    int res = 0;
+    if (op == "+") res = n1 + n2;
+    else if (op == "-") res = n1 - n2;
+    else if (op == "*") res = n1 * n2;
+    else if (op == "/") {
+      if (n2 == 0) return null;
+      if (n1 % n2 != 0) return null;
+      res = n1 ~/ n2;
+    }
+    return res.toString();
+  }
+
+  void _setCellAt(int x, int y, CellType type, String val) {
+    if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) return;
+    setState(() {
+      cells[y * gridWidth + x] = GridCell(x: x, y: y, type: type, value: val, isFixed: true);
     });
   }
 

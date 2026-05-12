@@ -15,9 +15,9 @@ class MathEngine {
   /// Carga los niveles pre-diseñados desde los archivos JSON de assets.
   static Future<void> loadLevels() async {
     try {
-      final easyData = await rootBundle.loadString('assets/levels_easy.json');
-      final mediumData = await rootBundle.loadString('assets/levels_medium.json');
-      final hardData = await rootBundle.loadString('assets/levels_hard.json');
+      final easyData = await rootBundle.loadString('assets/levels/easy/levels_easy.json');
+      final mediumData = await rootBundle.loadString('assets/levels/medium/levels_medium.json');
+      final hardData = await rootBundle.loadString('assets/levels/hard/levels_hard.json');
 
       _levelsByDifficulty['easy'] = _parseAndFilter(easyData);
       _levelsByDifficulty['medium'] = _parseAndFilter(mediumData);
@@ -171,10 +171,12 @@ class MathEngine {
     List<GridCell> cells = [];
     List<String> footerTiles = [];
     List<String> allowedOps = ['+', '-'];
-    if (levelId >= 3) allowedOps.add('*');
+    if (levelId >= 3 || difficulty != 'easy') allowedOps.add('*');
+    if (difficulty != 'easy') allowedOps.add('/');
     
-    _addOperation(cells, 1, 1, true, footerTiles, allowedOps, size, levelId, difficulty);
-    _addOperation(cells, 1, 3, true, footerTiles, allowedOps, size, levelId, difficulty);
+    // Añadimos dos operaciones paralelas y separadas para asegurar que el nivel no sea trivial
+    _addOperation(cells, 0, 1, true, footerTiles, allowedOps, size, levelId, difficulty);
+    _addOperation(cells, 0, size - 2, true, footerTiles, allowedOps, size, levelId, difficulty);
     
     return PuzzleLevel(id: levelId, size: size, cells: cells, footerTiles: footerTiles);
   }
@@ -337,25 +339,27 @@ class MathEngine {
   /// Genera una op que contiene el valor [t] en la posición [pos].
   static _OpData? _generateOpWithTarget(List<String> ops, int t, int pos, int levelId) {
     int maxNum = (20 + (levelId * 2)).clamp(10, 100);
-    String op = ops[_random.nextInt(ops.length)];
-    int a = 0, b = 0, res = 0;
-
+    int minNum = (levelId > 5) ? 2 : 1; // Evitar 0s y 1s en niveles avanzados
+    
     for (int retry = 0; retry < 50; retry++) {
+      String op = ops[_random.nextInt(ops.length)];
+      int a = 0, b = 0, res = 0;
+
       if (pos == 0) { // Target es 'a'
-        a = t; b = _random.nextInt(maxNum) + 1;
+        a = t; b = _random.nextInt(maxNum) + minNum;
         if (op == '/') { b = (_random.nextInt(9) + 2).clamp(2, a > 0 ? a : 10); a = (a ~/ b) * b; }
       } else if (pos == 1) { // Target es 'b'
-        b = t; a = _random.nextInt(maxNum) + 1;
+        b = t; a = _random.nextInt(maxNum) + minNum;
         if (op == '/') { a = b * (_random.nextInt(10) + 1); }
-        if (op == '-' && a < b) a = b + _random.nextInt(maxNum);
+        if (op == '-' && a < b) a = b + _random.nextInt(maxNum) + minNum;
       } else { // Target es 'res'
         res = t;
-        if (op == '+') { a = _random.nextInt(res.clamp(1, 1000)); b = res - a; }
-        else if (op == '-') { b = _random.nextInt(maxNum); a = res + b; }
+        if (op == '+') { a = _random.nextInt(res.clamp(minNum, 1000)); b = res - a; }
+        else if (op == '-') { b = _random.nextInt(maxNum) + minNum; a = res + b; }
         else if (op == '*') { 
           var factors = []; for(int i=1; i<=res; i++) if(res%i==0) factors.add(i);
           if (factors.isEmpty) return null; a = factors[_random.nextInt(factors.length)]; b = res ~/ a;
-        } else { b = (_random.nextInt(10) + 1); a = res * b; }
+        } else { b = (_random.nextInt(10) + minNum); a = res * b; }
       }
 
       if (op == '+') res = a + b; 
@@ -363,9 +367,9 @@ class MathEngine {
       if (op == '*') res = a * b; 
       if (op == '/') { if (b == 0) b = 1; res = a ~/ b; }
       
-      // Validar límites de 3 cifras (999) y lógica
+      // Validar límites y evitar resultados triviales (0, 1) en dificultades altas
       if (res >= 0 && res <= 999 && a >= 0 && a <= 999 && b >= 0 && b <= 999) {
-        // Para multiplicación, evitar que ambos sean grandes para mantenerlo mentalmente factible
+        if (levelId > 5 && (res < 2 || a < 2 || b < 2) && _random.nextDouble() < 0.8) continue;
         if (op == '*' && (a > 50 || b > 50)) continue;
         return _OpData(a, op, b, res);
       }
@@ -440,17 +444,17 @@ class MathEngine {
   /// La dificultad escala con el [levelId].
   static _OpData _generateValidOp(List<String> ops, int levelId) {
     int maxNum = (10 + (levelId * 2)).clamp(10, 100);
+    int minNum = (levelId > 3) ? 2 : 1;
     
     while (true) {
       String op = ops[_random.nextInt(ops.length)];
-      int a = _random.nextInt(maxNum) + 1;
-      int b = _random.nextInt(maxNum) + 1;
+      int a = _random.nextInt(maxNum) + minNum;
+      int b = _random.nextInt(maxNum) + minNum;
       int res = 0;
 
       if (op == '+') res = a + b;
       if (op == '-') { if (a < b) { int temp = a; a = b; b = temp; } res = a - b; }
       if (op == '*') { 
-        // Para multiplicación, limitar para que sea mentalmente posible y < 1000
         a = _random.nextInt(30) + 2;
         b = _random.nextInt(15) + 2;
         res = a * b; 
@@ -462,6 +466,8 @@ class MathEngine {
       }
 
       if (res >= 0 && res <= 999 && a >= 0 && a <= 999 && b >= 0 && b <= 999) {
+        // Evitar redundancia de 0 y 1 en niveles que no son de tutorial
+        if (levelId > 3 && (res < 2 || a < 2 || b < 2) && _random.nextDouble() < 0.7) continue;
         if (op == '*' && (a > 50 || b > 50)) continue;
         return _OpData(a, op, b, res);
       }
