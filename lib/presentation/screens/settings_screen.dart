@@ -20,7 +20,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: ref.read(settingsProvider).playerName);
+    _nameController = TextEditingController(
+      text: ref.read(settingsProvider).playerName,
+    );
   }
 
   @override
@@ -54,14 +56,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 controller: _nameController,
                 decoration: InputDecoration(
                   hintText: l10n.text('player_name_hint'),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 0,
+                  ),
                 ),
                 onChanged: (val) => notifier.setPlayerName(val),
               ),
             ),
           ),
-          
+
           _buildSection(context, l10n.text('appearance_section')),
           ListTile(
             title: Text(l10n.text('language_label')),
@@ -82,14 +89,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             activeThumbColor: AppTheme.primaryBlue,
             onChanged: (val) => notifier.toggleTheme(),
           ),
-          
-          
+
           _buildSection(context, l10n.text('number_size_section')),
           Row(
             children: [
-              _buildSizeOption(context, ref, l10n.text('small_label'), 0.8, settings.tileScale),
-              _buildSizeOption(context, ref, l10n.text('normal_label'), 1.0, settings.tileScale),
-              _buildSizeOption(context, ref, l10n.text('large_label'), 1.2, settings.tileScale),
+              _buildSizeOption(
+                context,
+                ref,
+                l10n.text('small_label'),
+                0.8,
+                settings.tileScale,
+              ),
+              _buildSizeOption(
+                context,
+                ref,
+                l10n.text('normal_label'),
+                1.0,
+                settings.tileScale,
+              ),
+              _buildSizeOption(
+                context,
+                ref,
+                l10n.text('large_label'),
+                1.2,
+                settings.tileScale,
+              ),
             ],
           ),
 
@@ -98,7 +122,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: Text(l10n.text('scrollbar_left_label')),
             subtitle: Text(l10n.text('scrollbar_left_subtitle')),
             value: settings.scrollbarOnLeft,
-            activeColor: AppTheme.primaryBlue,
+            activeThumbColor: AppTheme.primaryBlue,
             onChanged: (val) => notifier.setScrollbarOnLeft(val),
           ),
 
@@ -107,9 +131,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             title: Text(l10n.text('consent_status_label')),
             subtitle: Text(
-              settings.consentAccepted == null 
-                ? l10n.text('pending_status') 
-                : (settings.consentAccepted! ? l10n.text('accepted_status') : l10n.text('rejected_status'))
+              settings.consentAccepted == null
+                  ? l10n.text('pending_status')
+                  : (settings.consentAccepted!
+                        ? l10n.text('accepted_status')
+                        : l10n.text('rejected_status')),
             ),
             trailing: TextButton(
               onPressed: () => notifier.resetConsent(),
@@ -129,7 +155,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   actions: [
                     TextButton(
-                      onPressed: () => launchUrl(Uri.parse(l10n.text('privacy_policy_url'))),
+                      onPressed: () =>
+                          launchUrl(Uri.parse(l10n.text('privacy_policy_url'))),
                       child: Text(l10n.text('privacy_policy_button')),
                     ),
                     TextButton(
@@ -141,20 +168,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               );
             },
           ),
-          
+
           if (kDebugMode) ...[
             const Divider(height: 40),
             _buildSection(context, l10n.text('debug_section')),
-            
+
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(l10n.text('simulate_geo_label'), style: const TextStyle(fontSize: 12)),
+              child: Text(
+                l10n.text('simulate_geo_label'),
+                style: const TextStyle(fontSize: 12),
+              ),
             ),
             Row(
               children: [
-                _buildGeoOption(context, ref, 'Global', 'global', settings.geography),
-                _buildGeoOption(context, ref, 'Europa (UE)', 'ue', settings.geography),
-                _buildGeoOption(context, ref, 'USA (CCPA)', 'usa', settings.geography),
+                _buildGeoOption(
+                  context,
+                  ref,
+                  'Global',
+                  'global',
+                  settings.geography,
+                ),
+                _buildGeoOption(
+                  context,
+                  ref,
+                  'Europa (UE)',
+                  'ue',
+                  settings.geography,
+                ),
+                _buildGeoOption(
+                  context,
+                  ref,
+                  'USA (CCPA)',
+                  'usa',
+                  settings.geography,
+                ),
               ],
             ),
 
@@ -166,13 +214,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 width: 80,
                 child: TextField(
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(hintText: l10n.text('jump_to_level_hint')),
+                  decoration: InputDecoration(
+                    hintText: l10n.text('jump_to_level_hint'),
+                  ),
                   onSubmitted: (val) {
                     final level = int.tryParse(val);
                     if (level != null && level > 0) {
                       ref.read(gameProvider.notifier).startNewLevel(level);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.translate('jumping_to_level_msg', args: {'level': level.toString()}))),
+                        SnackBar(
+                          content: Text(
+                            l10n.translate(
+                              'jumping_to_level_msg',
+                              args: {'level': level.toString()},
+                            ),
+                          ),
+                        ),
                       );
                     }
                   },
@@ -193,14 +250,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.bold,
-          color: Theme.of(context).brightness == Brightness.light ? Colors.black : AppTheme.primaryBlue,
+          color: Theme.of(context).brightness == Brightness.light
+              ? Colors.black
+              : AppTheme.primaryBlue,
           letterSpacing: 2,
         ),
       ),
     );
   }
 
-  Widget _buildSizeOption(BuildContext context, WidgetRef ref, String label, double value, double current) {
+  Widget _buildSizeOption(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    double value,
+    double current,
+  ) {
     final isSelected = current == value;
     final theme = Theme.of(context);
     return Expanded(
@@ -210,7 +275,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primaryBlue : theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            color: isSelected
+                ? AppTheme.primaryBlue
+                : theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
@@ -226,7 +293,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildGeoOption(BuildContext context, WidgetRef ref, String label, String value, String current) {
+  Widget _buildGeoOption(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    String value,
+    String current,
+  ) {
     final isSelected = current == value;
     final theme = Theme.of(context);
     return Expanded(
@@ -236,7 +309,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.amberAccent : theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            color: isSelected
+                ? Colors.amberAccent
+                : theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Text(

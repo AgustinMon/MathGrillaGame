@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,7 +43,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     final settings = ref.read(settingsProvider);
     final isUE = settings.geography == 'ue';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -54,7 +52,10 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           l10n.text('privacy_title'),
-          style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Text(
           l10n.text('privacy_content'),
@@ -66,15 +67,27 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
               ref.read(settingsProvider.notifier).setConsent(false);
               Navigator.pop(context);
             },
-            child: Text(l10n.text('reject'), style: const TextStyle(color: Colors.grey)),
+            child: Text(
+              l10n.text('reject'),
+              style: const TextStyle(color: Colors.grey),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
               ref.read(settingsProvider.notifier).setConsent(true);
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, elevation: 0),
-            child: Text(l10n.text('accept'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryBlue,
+              elevation: 0,
+            ),
+            child: Text(
+              l10n.text('accept'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -130,11 +143,36 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      _buildHeaderAction(Icons.insights_rounded, isDark ? Colors.cyanAccent : Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsScreen()))),
+                      _buildHeaderAction(
+                        Icons.insights_rounded,
+                        isDark ? Colors.cyanAccent : Colors.blueGrey,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const StatsScreen(),
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      _buildHeaderAction(Icons.emoji_events_outlined, Colors.amber[700]!, () => Navigator.push(context, MaterialPageRoute(builder: (_) => MedalsScreen()))),
+                      _buildHeaderAction(
+                        Icons.emoji_events_outlined,
+                        Colors.amber[700]!,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => MedalsScreen()),
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      _buildHeaderAction(Icons.settings_outlined, isDark ? Colors.white70 : Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+                      _buildHeaderAction(
+                        Icons.settings_outlined,
+                        isDark ? Colors.white70 : Colors.blueGrey,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsScreen(),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
 
@@ -144,10 +182,13 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   Column(
                     children: [
                       Image.asset(
-                        'assets/images/title_logo.png',
-                        height: 100,
-                        fit: BoxFit.contain,
-                      ).animate().fadeIn(duration: 800.ms).scale(begin: const Offset(0.95, 0.95)),
+                            'assets/images/title_logo.png',
+                            height: 100,
+                            fit: BoxFit.contain,
+                          )
+                          .animate()
+                          .fadeIn(duration: 800.ms)
+                          .scale(begin: const Offset(0.95, 0.95)),
                       const SizedBox(height: 8),
                       Text(
                         l10n.text('challenge_your_mind'),
@@ -164,7 +205,12 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   const Spacer(flex: 1),
 
                   // Selector de Dificultad
-                  _buildThemedDifficultySelector(difficulty, isDark, cardBg, l10n),
+                  _buildThemedDifficultySelector(
+                    difficulty,
+                    isDark,
+                    cardBg,
+                    l10n,
+                  ),
 
                   const SizedBox(height: 40),
 
@@ -175,26 +221,29 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
                   // Acciones secundarias
                   _buildThemedCardAction(
-                    l10n.text('game_of_the_day'), 
-                    Icons.calendar_today_rounded, 
-                    const Color(0xFFF59E0B), 
+                    l10n.text('game_of_the_day'),
+                    Icons.calendar_today_rounded,
+                    const Color(0xFFF59E0B),
                     cardBg,
                     isDark,
                     () {
                       ref.read(gameProvider.notifier).startDailyChallenge();
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GameScreen()));
-                    }
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const GameScreen()),
+                      );
+                    },
                   ),
-                  
+
                   const SizedBox(height: 12),
 
                   _buildThemedCardAction(
-                    l10n.text('my_grids'), 
-                    Icons.auto_awesome_motion_rounded, 
-                    const Color(0xFF8B5CF6), 
+                    l10n.text('my_grids'),
+                    Icons.auto_awesome_motion_rounded,
+                    const Color(0xFF8B5CF6),
                     cardBg,
                     isDark,
-                    () => _showMyGridsList(context, l10n)
+                    () => _showMyGridsList(context, l10n),
                   ),
 
                   const SizedBox(height: 24),
@@ -203,17 +252,37 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildSimpleModeButton(l10n.text('explain_me'), Icons.psychology_outlined, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExplainMeScreen()))),
+                        child: _buildSimpleModeButton(
+                          l10n.text('explain_me'),
+                          Icons.psychology_outlined,
+                          isDark ? Colors.white54 : const Color(0xFF64748B),
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ExplainMeScreen(),
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildSimpleModeButton(l10n.text('editor'), Icons.edit_rounded, isDark ? Colors.white54 : const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelEditorScreen()))),
+                        child: _buildSimpleModeButton(
+                          l10n.text('editor'),
+                          Icons.edit_rounded,
+                          isDark ? Colors.white54 : const Color(0xFF64748B),
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LevelEditorScreen(),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
 
                   const Spacer(flex: 2),
-                  
+
                   // Link de Política de Privacidad
                   TextButton(
                     onPressed: () {
@@ -237,9 +306,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                       l10n.text('privacy_policy_title'),
                       style: TextStyle(
                         fontSize: 10,
-                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.4),
+                        color: (isDark ? Colors.white : Colors.black)
+                            .withOpacity(0.4),
                         decoration: TextDecoration.underline,
-                        decorationColor: (isDark ? Colors.white : Colors.black).withOpacity(0.2),
+                        decorationColor: (isDark ? Colors.white : Colors.black)
+                            .withOpacity(0.2),
                       ),
                     ),
                   ),
@@ -262,7 +333,12 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     );
   }
 
-  Widget _buildThemedDifficultySelector(String current, bool isDark, Color cardBg, Translations l10n) {
+  Widget _buildThemedDifficultySelector(
+    String current,
+    bool isDark,
+    Color cardBg,
+    Translations l10n,
+  ) {
     return Container(
       height: 48,
       padding: const EdgeInsets.all(4),
@@ -270,7 +346,11 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
         color: cardBg,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
@@ -282,14 +362,18 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
               child: AnimatedContainer(
                 duration: 250.ms,
                 decoration: BoxDecoration(
-                  color: isSelected ? (isDark ? Colors.white : const Color(0xFF0F172A)) : Colors.transparent,
+                  color: isSelected
+                      ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Center(
                   child: Text(
                     l10n.text('${d}_mode'),
                     style: TextStyle(
-                      color: isSelected ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white38 : Colors.black38),
+                      color: isSelected
+                          ? (isDark ? Colors.black : Colors.white)
+                          : (isDark ? Colors.white38 : Colors.black38),
                       fontWeight: FontWeight.w700,
                       fontSize: 11,
                       letterSpacing: 1.0,
@@ -306,44 +390,56 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
   Widget _buildPremiumPlayButton(BuildContext context, Translations l10n) {
     return GestureDetector(
-      onTap: () {
-        ref.read(gameProvider.notifier).startNewLevel(1);
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GameScreen()));
-      },
-      child: Container(
-        width: double.infinity,
-        height: 72,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            colors: [Colors.amber.shade400, Colors.amber.shade600],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.amber.shade600.withOpacity(0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+          onTap: () {
+            ref.read(gameProvider.notifier).startNewLevel(1);
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const GameScreen()),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            height: 72,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                colors: [Colors.amber.shade400, Colors.amber.shade600],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.amber.shade600.withOpacity(0.4),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            l10n.text('play_now'),
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
+            child: Center(
+              child: Text(
+                l10n.text('play_now'),
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 2500.ms, color: Colors.white12);
+        )
+        .animate(onPlay: (c) => c.repeat())
+        .shimmer(duration: 2500.ms, color: Colors.white12);
   }
 
-  Widget _buildThemedCardAction(String label, IconData icon, Color color, Color cardBg, bool isDark, VoidCallback onTap) {
+  Widget _buildThemedCardAction(
+    String label,
+    IconData icon,
+    Color color,
+    Color cardBg,
+    bool isDark,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -353,30 +449,50 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
           color: cardBg,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.03), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 16),
             Text(
               label,
-              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF1E293B), fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.5),
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                letterSpacing: 0.5,
+              ),
             ),
             const Spacer(),
-            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white12 : Colors.black12),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.white12 : Colors.black12,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSimpleModeButton(String label, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildSimpleModeButton(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return TextButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 18),
@@ -392,61 +508,111 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
   void _showMyGridsList(BuildContext context, Translations l10n) async {
     final prefs = await SharedPreferences.getInstance();
     final String? gridsJson = prefs.getString('my_custom_grids');
-    final List<dynamic> savedGrids = gridsJson != null ? json.decode(gridsJson) : [];
+    final List<dynamic> savedGrids = gridsJson != null
+        ? json.decode(gridsJson)
+        : [];
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(32),
         height: 500,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.text('my_grids'), style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.w800)),
+            Text(
+              l10n.text('my_grids'),
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             const SizedBox(height: 24),
             Expanded(
               child: savedGrids.isEmpty
-                ? Center(child: Text(l10n.text('no_saved_grids'), style: TextStyle(color: isDark ? Colors.white24 : Colors.black26)))
-                : ListView.builder(
-                    itemCount: savedGrids.length,
-                    itemBuilder: (context, i) {
-                      final g = savedGrids[i];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16),
+                  ? Center(
+                      child: Text(
+                        l10n.text('no_saved_grids'),
+                        style: TextStyle(
+                          color: isDark ? Colors.white24 : Colors.black26,
                         ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                          leading: const Icon(Icons.grid_on_rounded, color: Color(0xFF8B5CF6)),
-                          title: Text('${l10n.text('grid_label')} ${g['width']}x${g['height']}', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
-                          trailing: const Icon(Icons.play_arrow_rounded, color: Color(0xFF10B981), size: 30),
-                          onTap: () {
-                            final List<GridCell> levelCells = (g['cells'] as List).map((c) => GridCell(
-                              x: c['x'],
-                              y: c['y'],
-                              type: CellType.values[c['type']],
-                              value: c['value'],
-                              isFixed: c['isFixed'] ?? true,
-                            )).toList();
-                            final customLevel = PuzzleLevel(
-                              id: g['id'],
-                              size: g['width'] > g['height'] ? g['width'] : g['height'],
-                              cells: levelCells,
-                              footerTiles: [],
-                            );
-                            ref.read(gameProvider.notifier).loadCustomLevel(customLevel);
-                            Navigator.pop(context);
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GameScreen()));
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: savedGrids.length,
+                      itemBuilder: (context, i) {
+                        final g = savedGrids[i];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withOpacity(0.05)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 4,
+                            ),
+                            leading: const Icon(
+                              Icons.grid_on_rounded,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                            title: Text(
+                              '${l10n.text('grid_label')} ${g['width']}x${g['height']}',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.play_arrow_rounded,
+                              color: Color(0xFF10B981),
+                              size: 30,
+                            ),
+                            onTap: () {
+                              final List<GridCell> levelCells =
+                                  (g['cells'] as List)
+                                      .map(
+                                        (c) => GridCell(
+                                          x: c['x'],
+                                          y: c['y'],
+                                          type: CellType.values[c['type']],
+                                          value: c['value'],
+                                          isFixed: c['isFixed'] ?? true,
+                                        ),
+                                      )
+                                      .toList();
+                              final customLevel = PuzzleLevel(
+                                id: g['id'],
+                                size: g['width'] > g['height']
+                                    ? g['width']
+                                    : g['height'],
+                                cells: levelCells,
+                                footerTiles: [],
+                              );
+                              ref
+                                  .read(gameProvider.notifier)
+                                  .loadCustomLevel(customLevel);
+                              Navigator.pop(context);
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const GameScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

@@ -11,11 +11,7 @@ import '../../data/repositories/medal_repository.dart';
 import '../../data/repositories/stats_repository.dart';
 import '../../core/utils/sound_service.dart';
 
-enum ValidationResult {
-  match,
-  mathOnly,
-  wrong,
-}
+enum ValidationResult { match, mathOnly, wrong }
 
 /// Representa el estado actual del juego en un momento dado.
 class GameState {
@@ -26,16 +22,21 @@ class GameState {
   final int timeLeft; // Segundos restantes para completar el nivel.
   final bool isGameOver; // Indica si el jugador ha perdido.
   final bool isLevelComplete; // Indica si el jugador ha ganado el nivel actual.
-  final Set<String> solvedCells; // Celdas que forman parte de una ecuación correcta (formato "x,y").
-  final Set<String> mathOnlyCells; // Celdas que forman parte de una ecuación matemáticamente correcta pero incorrecta para el puzzle.
+  final Set<String>
+  solvedCells; // Celdas que forman parte de una ecuación correcta (formato "x,y").
+  final Set<String>
+  mathOnlyCells; // Celdas que forman parte de una ecuación matemáticamente correcta pero incorrecta para el puzzle.
   final Set<int> solvedRows; // Filas que han sido completadas correctamente.
   final Set<int> solvedCols; // Columnas que han sido completadas correctamente.
   final List<Medal> medals; // Lista de medallas/logros del jugador.
-  final String? message; // Mensaje temporal de feedback (ej: "¡Casi! Revisa tus cálculos").
+  final String?
+  message; // Mensaje temporal de feedback (ej: "¡Casi! Revisa tus cálculos").
   final String difficulty; // Dificultad actual ('easy', 'medium', 'hard').
   final int hintsRemaining; // Pistas disponibles.
-  final bool isTimerPaused; // Indica si el tiempo está pausado (ej: viendo un anuncio).
-  final bool showTutorial; // Indica si se debe mostrar el tutorial al iniciar el Nivel 1.
+  final bool
+  isTimerPaused; // Indica si el tiempo está pausado (ej: viendo un anuncio).
+  final bool
+  showTutorial; // Indica si se debe mostrar el tutorial al iniciar el Nivel 1.
   final String? machineInputA;
   final String? machineInputB;
   final String machineOp;
@@ -54,7 +55,8 @@ class GameState {
   final int lifeLostTrigger; // Incrementado para animar la pérdida de vida
   final Map<String, Map<String, dynamic>> fusedTilesData;
   final List<Map<String, dynamic>> moveHistory; // Historial para deshacer
-  final bool isTimerCountDown; // true para hard (baja), false para easy/medium (sube)
+  final bool
+  isTimerCountDown; // true para hard (baja), false para easy/medium (sube)
 
   GameState({
     this.currentLevel,
@@ -155,17 +157,27 @@ class GameState {
       hintsRemaining: hintsRemaining ?? this.hintsRemaining,
       isTimerPaused: isTimerPaused ?? this.isTimerPaused,
       showTutorial: showTutorial ?? this.showTutorial,
-      machineInputA: clearMachineA ? null : (machineInputA ?? this.machineInputA),
-      machineInputB: clearMachineB ? null : (machineInputB ?? this.machineInputB),
+      machineInputA: clearMachineA
+          ? null
+          : (machineInputA ?? this.machineInputA),
+      machineInputB: clearMachineB
+          ? null
+          : (machineInputB ?? this.machineInputB),
       machineOp: machineOp ?? this.machineOp,
       machineTiles: machineTiles ?? this.machineTiles,
-      machineInputAFromMachine: machineInputAFromMachine ?? this.machineInputAFromMachine,
-      machineInputBFromMachine: machineInputBFromMachine ?? this.machineInputBFromMachine,
-      machineResult: clearMachineResult ? null : (machineResult ?? this.machineResult),
+      machineInputAFromMachine:
+          machineInputAFromMachine ?? this.machineInputAFromMachine,
+      machineInputBFromMachine:
+          machineInputBFromMachine ?? this.machineInputBFromMachine,
+      machineResult: clearMachineResult
+          ? null
+          : (machineResult ?? this.machineResult),
       machineLastInputA: machineLastInputA ?? this.machineLastInputA,
       machineLastInputB: machineLastInputB ?? this.machineLastInputB,
-      machineLastInputAFromMachine: machineLastInputAFromMachine ?? this.machineLastInputAFromMachine,
-      machineLastInputBFromMachine: machineInputBFromMachine ?? this.machineLastInputBFromMachine,
+      machineLastInputAFromMachine:
+          machineLastInputAFromMachine ?? this.machineLastInputAFromMachine,
+      machineLastInputBFromMachine:
+          machineInputBFromMachine ?? this.machineLastInputBFromMachine,
       machineLastOp: machineLastOp ?? this.machineLastOp,
       fusedTilesData: fusedTilesData ?? this.fusedTilesData,
       comboCount: comboCount ?? this.comboCount,
@@ -178,7 +190,7 @@ class GameState {
   }
 
   // Helper para saber si es el desafío diario
-  bool get isDailyChallenge => levelNumber != null && levelNumber! > 5000;
+  bool get isDailyChallenge => levelNumber > 5000;
 }
 
 /// Maneja la lógica del negocio y las actualizaciones del estado del juego.
@@ -214,17 +226,22 @@ class GameNotifier extends StateNotifier<GameState> {
     if (count > 0) {
       selectedLevelId = Random().nextInt(count) + 1;
     }
-    
-    final newLevel = MathEngine.generateLevel(selectedLevelId, difficulty: state.difficulty);
-    
+
+    final newLevel = MathEngine.generateLevel(
+      selectedLevelId,
+      difficulty: state.difficulty,
+    );
+
     // Tiempo dinámico: 60s base + 4s por cada celda que el usuario debe completar.
     int emptyCellsCount = newLevel.cells.where((c) => !c.isFixed).length;
     int calculatedTime = 60 + (emptyCellsCount * 4);
-    
+
     // Multiplicadores de dificultad para mayor reto.
     bool countDown = state.difficulty == 'hard';
-    if (state.difficulty == 'medium') calculatedTime = (calculatedTime * 1.2).toInt();
-    if (state.difficulty == 'hard') calculatedTime = (calculatedTime * 1.5).toInt();
+    if (state.difficulty == 'medium')
+      calculatedTime = (calculatedTime * 1.2).toInt();
+    if (state.difficulty == 'hard')
+      calculatedTime = (calculatedTime * 1.5).toInt();
 
     state = state.copyWith(
       currentLevel: newLevel,
@@ -259,7 +276,7 @@ class GameNotifier extends StateNotifier<GameState> {
   void loadCustomLevel(PuzzleLevel customLevel) {
     List<GridCell> playableCells = List.from(customLevel.cells);
     List<String> footer = [];
-    
+
     // 1. Identificar todas las ecuaciones (secuencias de 5 celdas)
     List<List<int>> equationIndices = [];
     int size = customLevel.size;
@@ -271,10 +288,14 @@ class GameNotifier extends StateNotifier<GameState> {
         List<int> indices = [];
         for (int i = 0; i < 5; i++) {
           int idx = playableCells.indexWhere((c) => c.x == x + i && c.y == y);
-          if (idx == -1 || playableCells[idx].type == CellType.empty) { isEq = false; break; }
+          if (idx == -1 || playableCells[idx].type == CellType.empty) {
+            isEq = false;
+            break;
+          }
           indices.add(idx);
         }
-        if (isEq && playableCells[indices[3]].value == '=') equationIndices.add(indices);
+        if (isEq && playableCells[indices[3]].value == '=')
+          equationIndices.add(indices);
       }
     }
     // Verticales
@@ -284,19 +305,24 @@ class GameNotifier extends StateNotifier<GameState> {
         List<int> indices = [];
         for (int i = 0; i < 5; i++) {
           int idx = playableCells.indexWhere((c) => c.x == x && c.y == y + i);
-          if (idx == -1 || playableCells[idx].type == CellType.empty) { isEq = false; break; }
+          if (idx == -1 || playableCells[idx].type == CellType.empty) {
+            isEq = false;
+            break;
+          }
           indices.add(idx);
         }
-        if (isEq && playableCells[indices[3]].value == '=') equationIndices.add(indices);
+        if (isEq && playableCells[indices[3]].value == '=')
+          equationIndices.add(indices);
       }
     }
 
     // 2. Decidir qué celdas se quedan (fijas)
     Set<int> fixedIndices = {};
-    
+
     // Los signos siempre se quedan
     for (int i = 0; i < playableCells.length; i++) {
-      if (playableCells[i].type == CellType.operator || playableCells[i].type == CellType.equals) {
+      if (playableCells[i].type == CellType.operator ||
+          playableCells[i].type == CellType.equals) {
         fixedIndices.add(i);
       }
     }
@@ -322,15 +348,17 @@ class GameNotifier extends StateNotifier<GameState> {
       } else {
         // Al inventario
         footer.add(cell.value!);
-        finalCells.add(GridCell(
-          x: cell.x,
-          y: cell.y,
-          type: cell.type,
-          value: cell.value,
-          currentValue: null,
-          isFixed: false,
-          isHorizontal: cell.isHorizontal,
-        ));
+        finalCells.add(
+          GridCell(
+            x: cell.x,
+            y: cell.y,
+            type: cell.type,
+            value: cell.value,
+            currentValue: null,
+            isFixed: false,
+            isHorizontal: cell.isHorizontal,
+          ),
+        );
       }
     }
 
@@ -371,8 +399,8 @@ class GameNotifier extends StateNotifier<GameState> {
     // Forzamos un ID alto (> 5000) para saltar los niveles pre-diseñados del JSON
     // que contienen números excesivamente grandes.
     final seed = now.year * 10000 + now.month * 100 + now.day;
-    final dailyId = 5001 + (seed % 1000); 
-    
+    final dailyId = 5001 + (seed % 1000);
+
     startNewLevel(dailyId);
     state = state.copyWith(message: '¡DESAFÍO DIARIO!');
   }
@@ -387,8 +415,9 @@ class GameNotifier extends StateNotifier<GameState> {
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (state.isTimerPaused || state.isGameOver || state.isLevelComplete) return;
-      
+      if (state.isTimerPaused || state.isGameOver || state.isLevelComplete)
+        return;
+
       if (state.isTimerCountDown) {
         if (state.timeLeft > 0) {
           state = state.copyWith(timeLeft: state.timeLeft - 1);
@@ -404,9 +433,17 @@ class GameNotifier extends StateNotifier<GameState> {
   }
 
   /// Coloca una pieza de número en una posición específica del tablero.
-  void placeTile(int x, int y, String value, {Map<String, dynamic>? fusionData}) {
-    if (state.currentLevel == null || state.isGameOver || state.isLevelComplete)
+  void placeTile(
+    int x,
+    int y,
+    String value, {
+    Map<String, dynamic>? fusionData,
+  }) {
+    if (state.currentLevel == null ||
+        state.isGameOver ||
+        state.isLevelComplete) {
       return;
+    }
 
     final cellIndex = state.currentLevel!.cells.indexWhere(
       (c) => c.x == x && c.y == y,
@@ -442,7 +479,7 @@ class GameNotifier extends StateNotifier<GameState> {
     // Registramos en el historial
     final newHistory = List<Map<String, dynamic>>.from(state.moveHistory);
     newHistory.add({'x': x, 'y': y});
-    
+
     state = state.copyWith(
       moveHistory: newHistory,
       currentLevel: PuzzleLevel(
@@ -456,7 +493,9 @@ class GameNotifier extends StateNotifier<GameState> {
 
     // Guardamos metadata si es una pieza fusionada
     if (fusionData != null) {
-      final newFusedData = Map<String, Map<String, dynamic>>.from(state.fusedTilesData);
+      final newFusedData = Map<String, Map<String, dynamic>>.from(
+        state.fusedTilesData,
+      );
       newFusedData["$x,$y"] = fusionData;
       state = state.copyWith(fusedTilesData: newFusedData);
     }
@@ -468,8 +507,11 @@ class GameNotifier extends StateNotifier<GameState> {
 
   /// Quita una pieza del tablero y la devuelve al footer.
   void removeTile(int x, int y) {
-    if (state.currentLevel == null || state.isGameOver || state.isLevelComplete)
+    if (state.currentLevel == null ||
+        state.isGameOver ||
+        state.isLevelComplete) {
       return;
+    }
 
     final cellIndex = state.currentLevel!.cells.indexWhere(
       (c) => c.x == x && c.y == y,
@@ -493,7 +535,9 @@ class GameNotifier extends StateNotifier<GameState> {
       final fromMachineB = data['fromB'] as bool? ?? false;
 
       // Quitamos la metadata
-      final newFusedData = Map<String, Map<String, dynamic>>.from(state.fusedTilesData);
+      final newFusedData = Map<String, Map<String, dynamic>>.from(
+        state.fusedTilesData,
+      );
       newFusedData.remove(posKey);
 
       // Devolvemos los ingredientes originales a la máquina
@@ -528,7 +572,9 @@ class GameNotifier extends StateNotifier<GameState> {
       ),
     );
     // Quitamos del historial si existía manualmente
-    final newHistory = state.moveHistory.where((m) => m['x'] != x || m['y'] != y).toList();
+    final newHistory = state.moveHistory
+        .where((m) => m['x'] != x || m['y'] != y)
+        .toList();
     state = state.copyWith(moveHistory: newHistory);
 
     _checkWinCondition();
@@ -542,7 +588,7 @@ class GameNotifier extends StateNotifier<GameState> {
   /// Deshace el último movimiento realizado en la grilla.
   void undoMove() {
     if (state.moveHistory.isEmpty || state.isTimerPaused) return;
-    
+
     final lastMove = state.moveHistory.last;
     removeTile(lastMove['x'], lastMove['y']);
   }
@@ -552,13 +598,17 @@ class GameNotifier extends StateNotifier<GameState> {
     if (state.currentLevel == null) return;
 
     // Obtenemos todas las celdas de la fila y columna impactadas, ordenadas.
-    final rowCells = state.currentLevel!.cells
-        .where((c) => c.y == y && c.type != CellType.empty)
-        .toList()..sort((a, b) => a.x.compareTo(b.x));
-        
-    final colCells = state.currentLevel!.cells
-        .where((c) => c.x == x && c.type != CellType.empty)
-        .toList()..sort((a, b) => a.y.compareTo(b.y));
+    final rowCells =
+        state.currentLevel!.cells
+            .where((c) => c.y == y && c.type != CellType.empty)
+            .toList()
+          ..sort((a, b) => a.x.compareTo(b.x));
+
+    final colCells =
+        state.currentLevel!.cells
+            .where((c) => c.x == x && c.type != CellType.empty)
+            .toList()
+          ..sort((a, b) => a.y.compareTo(b.y));
 
     // Buscamos secuencias de 5 celdas (a op b = res)
     for (int i = 0; i <= rowCells.length - 5; i++) {
@@ -567,7 +617,7 @@ class GameNotifier extends StateNotifier<GameState> {
         _checkOperation(sub, isHorizontal: true);
       }
     }
-    
+
     for (int i = 0; i <= colCells.length - 5; i++) {
       final sub = colCells.sublist(i, i + 5);
       if (sub[3].type == CellType.equals) {
@@ -593,25 +643,26 @@ class GameNotifier extends StateNotifier<GameState> {
 
       final ValidationResult validation = _validateMathAndPuzzle(cells);
       final newSolvedCells = Set<String>.from(state.solvedCells);
-      
+
       if (validation == ValidationResult.match) {
         for (var c in cells) {
           newSolvedCells.add('${c.x},${c.y}');
         }
-        
+
         final now = DateTime.now();
         int points = 100;
         int newCombo = 1;
-        
+
         if (state.lastSolveTime != null) {
           final diff = now.difference(state.lastSolveTime!).inSeconds;
-          if (diff < 10) { // Si resuelve en menos de 10s, combo!
+          if (diff < 10) {
+            // Si resuelve en menos de 10s, combo!
             newCombo = state.comboCount + 1;
             if (newCombo > 3) newCombo = 3; // Límite máximo de x3
             points *= newCombo;
           }
         }
-        
+
         StatsRepository().updateBestCombo(newCombo);
 
         if (isHorizontal) {
@@ -621,7 +672,9 @@ class GameNotifier extends StateNotifier<GameState> {
             score: state.score + points,
             comboCount: newCombo,
             lastSolveTime: now,
-            message: newCombo > 1 ? 'COMBO x$newCombo! +$points' : '¡Excelente!',
+            message: newCombo > 1
+                ? 'COMBO x$newCombo! +$points'
+                : '¡Excelente!',
             timeLeft: state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
           );
         } else {
@@ -631,11 +684,13 @@ class GameNotifier extends StateNotifier<GameState> {
             score: state.score + points,
             comboCount: newCombo,
             lastSolveTime: now,
-            message: newCombo > 1 ? 'COMBO x$newCombo! +$points' : '¡Excelente!',
+            message: newCombo > 1
+                ? 'COMBO x$newCombo! +$points'
+                : '¡Excelente!',
             timeLeft: state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
           );
         }
-        
+
         // Sumar puntos inmediatamente a las estadísticas del jugador
         StatsRepository().addScore(points);
 
@@ -699,26 +754,34 @@ class GameNotifier extends StateNotifier<GameState> {
 
     // Comprobamos cada fila
     for (int y = 0; y < size; y++) {
-      final rowCells = cells.where((c) => c.y == y && c.type != CellType.empty).toList()..sort((a, b) => a.x.compareTo(b.x));
-      
+      final rowCells =
+          cells.where((c) => c.y == y && c.type != CellType.empty).toList()
+            ..sort((a, b) => a.x.compareTo(b.x));
+
       for (int i = 0; i <= rowCells.length - 5; i++) {
         final sub = rowCells.sublist(i, i + 5);
         if (sub[3].type == CellType.equals && _isMathCorrect(sub)) {
           newlySolvedRows.add(y);
-          for (var c in sub) newlySolvedCells.add("${c.x},${c.y}");
+          for (var c in sub) {
+            newlySolvedCells.add("${c.x},${c.y}");
+          }
         }
       }
     }
 
     // Comprobamos cada columna
     for (int x = 0; x < size; x++) {
-      final colCells = cells.where((c) => c.x == x && c.type != CellType.empty).toList()..sort((a, b) => a.y.compareTo(b.y));
+      final colCells =
+          cells.where((c) => c.x == x && c.type != CellType.empty).toList()
+            ..sort((a, b) => a.y.compareTo(b.y));
 
       for (int i = 0; i <= colCells.length - 5; i++) {
         final sub = colCells.sublist(i, i + 5);
         if (sub[3].type == CellType.equals && _isMathCorrect(sub)) {
           newlySolvedCols.add(x);
-          for (var c in sub) newlySolvedCells.add("${c.x},${c.y}");
+          for (var c in sub) {
+            newlySolvedCells.add("${c.x},${c.y}");
+          }
         }
       }
     }
@@ -730,41 +793,60 @@ class GameNotifier extends StateNotifier<GameState> {
     );
 
     // Condición de victoria: todas las celdas que NO están vacías deben estar en newlySolvedCells
-    final allOperationCells = cells.where((c) => c.type != CellType.empty).toList();
-    final allGridCorrect = allOperationCells.isNotEmpty && allOperationCells.every((c) => newlySolvedCells.contains("${c.x},${c.y}"));
-    
+    final allOperationCells = cells
+        .where((c) => c.type != CellType.empty)
+        .toList();
+    final allGridCorrect =
+        allOperationCells.isNotEmpty &&
+        allOperationCells.every(
+          (c) => newlySolvedCells.contains("${c.x},${c.y}"),
+        );
+
     final footerEmpty = state.currentLevel!.footerTiles.isEmpty;
-    final gridFull = cells.every((c) => c.currentValue != null || c.type == CellType.empty || c.isFixed);
+    final gridFull = cells.every(
+      (c) => c.currentValue != null || c.type == CellType.empty || c.isFixed,
+    );
 
     if (allGridCorrect && footerEmpty && !state.isLevelComplete) {
       _timer?.cancel();
       SoundService.playWin();
       _checkMedals();
-      
+
       final levelBonus = state.levelNumber * 50;
       final timeBonus = state.timeLeft * 2;
       final extraScore = levelBonus + timeBonus;
       final finalScore = state.score + extraScore;
-      
+
       StatsRepository().incrementGamesWon();
       // Solo guardamos los bonos extra al finalizar porque los puntos base ya se guardaron en _checkOperation
       StatsRepository().addScore(extraScore);
-      
+
       // Registrar métricas de la partida
       int timeTaken = 0;
       if (state.isTimerCountDown) {
-        int emptyCellsCount = state.currentLevel!.cells.where((c) => !c.isFixed).length;
+        int emptyCellsCount = state.currentLevel!.cells
+            .where((c) => !c.isFixed)
+            .length;
         int calculatedTime = 60 + (emptyCellsCount * 4);
-        if (state.difficulty == 'medium') calculatedTime = (calculatedTime * 1.2).toInt();
-        if (state.difficulty == 'hard') calculatedTime = (calculatedTime * 1.5).toInt();
+        if (state.difficulty == 'medium')
+          calculatedTime = (calculatedTime * 1.2).toInt();
+        if (state.difficulty == 'hard')
+          calculatedTime = (calculatedTime * 1.5).toInt();
         timeTaken = calculatedTime - state.timeLeft;
       } else {
-        timeTaken = state.timeLeft; // En modo progresivo el timeLeft representa el tiempo transcurrido
+        timeTaken = state
+            .timeLeft; // En modo progresivo el timeLeft representa el tiempo transcurrido
       }
       if (timeTaken < 0) timeTaken = 0;
-      
-      int eqCount = state.currentLevel!.cells.where((c) => c.type == CellType.equals).length;
-      StatsRepository().saveGameCompletionMetrics(timeTaken, eqCount, DateTime.now().hour);
+
+      int eqCount = state.currentLevel!.cells
+          .where((c) => c.type == CellType.equals)
+          .length;
+      StatsRepository().saveGameCompletionMetrics(
+        timeTaken,
+        eqCount,
+        DateTime.now().hour,
+      );
 
       state = state.copyWith(
         isLevelComplete: true,
@@ -773,31 +855,43 @@ class GameNotifier extends StateNotifier<GameState> {
       );
     } else if (gridFull && footerEmpty && !allGridCorrect) {
       // Si el tablero está lleno y el inventario vacío pero algo está mal.
-      state = state.copyWith(message: 'El tablero está lleno pero hay errores. ¡Revisa bien!');
+      state = state.copyWith(
+        message: 'El tablero está lleno pero hay errores. ¡Revisa bien!',
+      );
     }
   }
 
   ValidationResult _validateMathAndPuzzle(List<GridCell> cells) {
     if (cells.length < 5) return ValidationResult.wrong;
     // Extraemos valores asegurándonos de usar currentValue si existe, o value si es fijo.
-    final valAStr = cells[0].currentValue ?? (cells[0].isFixed ? cells[0].value : null);
-    final op = cells[1].currentValue ?? (cells[1].isFixed ? cells[1].value : null);
-    final valBStr = cells[2].currentValue ?? (cells[2].isFixed ? cells[2].value : null);
-    final valResStr = cells[4].currentValue ?? (cells[4].isFixed ? cells[4].value : null);
+    final valAStr =
+        cells[0].currentValue ?? (cells[0].isFixed ? cells[0].value : null);
+    final op =
+        cells[1].currentValue ?? (cells[1].isFixed ? cells[1].value : null);
+    final valBStr =
+        cells[2].currentValue ?? (cells[2].isFixed ? cells[2].value : null);
+    final valResStr =
+        cells[4].currentValue ?? (cells[4].isFixed ? cells[4].value : null);
 
-    if (valAStr == null || op == null || valBStr == null || valResStr == null) return ValidationResult.wrong;
+    if (valAStr == null || op == null || valBStr == null || valResStr == null)
+      return ValidationResult.wrong;
 
     final valA = int.tryParse(valAStr);
     final valB = int.tryParse(valBStr);
     final valRes = int.tryParse(valResStr);
 
-    if (valA == null || valB == null || valRes == null) return ValidationResult.wrong;
+    if (valA == null || valB == null || valRes == null)
+      return ValidationResult.wrong;
 
     bool isMathCorrect = false;
-    if (op == '+') isMathCorrect = valA + valB == valRes;
-    else if (op == '-') isMathCorrect = valA - valB == valRes;
-    else if (op == '*') isMathCorrect = valA * valB == valRes;
-    else if (op == '/') isMathCorrect = valB != 0 && valA / valB == valRes;
+    if (op == '+') {
+      isMathCorrect = valA + valB == valRes;
+    } else if (op == '-')
+      isMathCorrect = valA - valB == valRes;
+    else if (op == '*')
+      isMathCorrect = valA * valB == valRes;
+    else if (op == '/')
+      isMathCorrect = valB != 0 && valA / valB == valRes;
 
     if (!isMathCorrect) return ValidationResult.wrong;
 
@@ -821,13 +915,17 @@ class GameNotifier extends StateNotifier<GameState> {
 
   /// Utiliza una pista para revelar una celda al azar.
   void useHint() {
-    if (state.hintsRemaining <= 0 || state.currentLevel == null || state.isGameOver || state.isLevelComplete) return;
+    if (state.hintsRemaining <= 0 ||
+        state.currentLevel == null ||
+        state.isGameOver ||
+        state.isLevelComplete)
+      return;
 
     // Solo sugerimos pistas para celdas que no están fijas
     // Y que NO forman parte de una ecuación ya resuelta matemáticamente.
     final unsolvedCells = state.currentLevel!.cells.where((c) {
       if (c.isFixed || c.type == CellType.empty) return false;
-      
+
       // Si la celda está en solvedCells, significa que ya es parte de una ecuación válida.
       // No deberíamos sugerir cambiarla incluso si no coincide con el 'value' original (variante).
       return !state.solvedCells.contains('${c.x},${c.y}');
@@ -837,7 +935,7 @@ class GameNotifier extends StateNotifier<GameState> {
       state = state.copyWith(message: '¡Todo lo colocado parece correcto!');
       return;
     }
-    
+
     // De las celdas sin resolver, elegimos una al azar.
     final target = unsolvedCells[Random().nextInt(unsolvedCells.length)];
 
@@ -845,7 +943,7 @@ class GameNotifier extends StateNotifier<GameState> {
       // Al usar una pista, si el número estaba en el footer o máquina, deberíamos quitarlo.
       final updatedFooter = List<String>.from(state.currentLevel!.footerTiles);
       updatedFooter.remove(target.value);
-      
+
       final updatedMachine = List<String>.from(state.machineTiles);
       updatedMachine.remove(target.value);
 
@@ -911,19 +1009,23 @@ class GameNotifier extends StateNotifier<GameState> {
 
   void addToMachine(int slot, String value, {bool isMachineTile = false}) {
     if (state.difficulty != 'hard') return;
-    
+
     // Solo permitimos ingredientes (rosas) en la máquina como pidió el usuario.
     if (!isMachineTile) {
       state = state.copyWith(message: 'only_pink');
       return;
     }
 
-    List<String> updatedFooter = List<String>.from(state.currentLevel?.footerTiles ?? []);
+    List<String> updatedFooter = List<String>.from(
+      state.currentLevel?.footerTiles ?? [],
+    );
     List<String> updatedMachine = List<String>.from(state.machineTiles);
 
     // 1. Devolver el valor anterior del slot si existe
     final oldValue = slot == 1 ? state.machineInputA : state.machineInputB;
-    final wasFromMachine = slot == 1 ? state.machineInputAFromMachine : state.machineInputBFromMachine;
+    final wasFromMachine = slot == 1
+        ? state.machineInputAFromMachine
+        : state.machineInputBFromMachine;
 
     if (oldValue != null) {
       if (wasFromMachine) {
@@ -952,8 +1054,12 @@ class GameNotifier extends StateNotifier<GameState> {
       machineTiles: updatedMachine,
       machineInputA: slot == 1 ? value : state.machineInputA,
       machineInputB: slot == 2 ? value : state.machineInputB,
-      machineInputAFromMachine: slot == 1 ? isMachineTile : state.machineInputAFromMachine,
-      machineInputBFromMachine: slot == 2 ? isMachineTile : state.machineInputBFromMachine,
+      machineInputAFromMachine: slot == 1
+          ? isMachineTile
+          : state.machineInputAFromMachine,
+      machineInputBFromMachine: slot == 2
+          ? isMachineTile
+          : state.machineInputBFromMachine,
     );
 
     SoundService.playTileDrop();
@@ -961,7 +1067,9 @@ class GameNotifier extends StateNotifier<GameState> {
 
   void removeFromMachine(int slot) {
     final value = slot == 1 ? state.machineInputA : state.machineInputB;
-    final isMachineTile = slot == 1 ? state.machineInputAFromMachine : state.machineInputBFromMachine;
+    final isMachineTile = slot == 1
+        ? state.machineInputAFromMachine
+        : state.machineInputBFromMachine;
     if (value == null) return;
 
     if (isMachineTile) {
@@ -1040,10 +1148,7 @@ class GameNotifier extends StateNotifier<GameState> {
     if (valA != null) addToMachine(1, valA, isMachineTile: fromMachineA);
     if (valB != null) addToMachine(2, valB, isMachineTile: fromMachineB);
 
-    state = state.copyWith(
-      clearMachineResult: true,
-      message: 'fusion_undo',
-    );
+    state = state.copyWith(clearMachineResult: true, message: 'fusion_undo');
   }
 
   /// Limpia la máquina cuando el resultado se usa en el tablero.

@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/settings_provider.dart';
 import '../../core/utils/translations.dart';
 import '../widgets/math_tile.dart';
-import '../../domain/entities/puzzle_level.dart';
 
 class ExplainMeScreen extends ConsumerStatefulWidget {
   const ExplainMeScreen({super.key});
@@ -15,11 +14,11 @@ class ExplainMeScreen extends ConsumerStatefulWidget {
 
 class _ExplainMeScreenState extends ConsumerState<ExplainMeScreen> {
   int step = 0;
-  
+
   @override
   Widget build(BuildContext context) {
     final l10n = ref.watch(translationsProvider);
-    
+
     final List<String> explanations = [
       l10n.text('explanation_0'),
       l10n.text('explanation_1'),
@@ -35,10 +34,7 @@ class _ExplainMeScreenState extends ConsumerState<ExplainMeScreen> {
         children: [
           Expanded(
             child: Stack(
-              children: [
-                _buildDemoGrid(),
-                if (step > 0) _buildHighlight(),
-              ],
+              children: [_buildDemoGrid(), if (step > 0) _buildHighlight()],
             ),
           ),
           _buildExplanatoryModal(l10n, explanations),
@@ -104,14 +100,16 @@ class _ExplainMeScreenState extends ConsumerState<ExplainMeScreen> {
       height: 50,
       margin: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: isTarget ? Colors.yellow.withOpacity(0.3) : Colors.blue.withOpacity(0.1),
+        color: isTarget
+            ? Colors.yellow.withOpacity(0.3)
+            : Colors.blue.withOpacity(0.1),
         border: Border.all(color: isTarget ? Colors.orange : Colors.blueAccent),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Center(
-        child: val.isEmpty 
-          ? null 
-          : MathTile(value: val, size: 40, animateOnEntry: true),
+        child: val.isEmpty
+            ? null
+            : MathTile(value: val, size: 40, animateOnEntry: true),
       ),
     ).animate(target: isTarget ? 1 : 0).shimmer();
   }
@@ -121,7 +119,12 @@ class _ExplainMeScreenState extends ConsumerState<ExplainMeScreen> {
       width: 50,
       height: 50,
       margin: const EdgeInsets.all(2),
-      child: Center(child: Text(val, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold))),
+      child: Center(
+        child: Text(
+          val,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+      ),
     );
   }
 
@@ -147,7 +150,11 @@ class _ExplainMeScreenState extends ConsumerState<ExplainMeScreen> {
         children: [
           Text(
             explanations[step],
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: textColor),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: textColor,
+            ),
             textAlign: TextAlign.center,
           ).animate(key: ValueKey(step)).fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 24),
@@ -161,7 +168,11 @@ class _ExplainMeScreenState extends ConsumerState<ExplainMeScreen> {
                 }
               });
             },
-            child: Text(step < explanations.length - 1 ? l10n.text('next_button') : l10n.text('understood_button')),
+            child: Text(
+              step < explanations.length - 1
+                  ? l10n.text('next_button')
+                  : l10n.text('understood_button'),
+            ),
           ),
         ],
       ),
