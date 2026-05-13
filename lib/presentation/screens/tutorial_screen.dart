@@ -40,8 +40,6 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
   void _showConsentDialog() {
     final l10n = ref.read(translationsProvider);
-    final settings = ref.read(settingsProvider);
-    final isUE = settings.geography == 'ue';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
@@ -281,6 +279,13 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                     ],
                   ),
 
+                  const SizedBox(height: 16),
+                  // Decoración de Medallas Desbloqueadas
+                  _buildUnlockedMedalsCarousel(
+                    ref.watch(gameProvider).medals,
+                    isDark,
+                  ),
+
                   const Spacer(flex: 2),
 
                   // Link de Política de Privacidad
@@ -389,6 +394,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
   }
 
   Widget _buildPremiumPlayButton(BuildContext context, Translations l10n) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
           onTap: () {
             ref.read(gameProvider.notifier).startNewLevel(1);
@@ -402,6 +408,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
             height: 72,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
+              border: isDark ? null : Border.all(color: Colors.black, width: 4),
               gradient: LinearGradient(
                 colors: [Colors.amber.shade400, Colors.amber.shade600],
                 begin: Alignment.topLeft,
@@ -619,4 +626,65 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
       ),
     );
   }
+
+  Widget _buildUnlockedMedalsCarousel(List<dynamic> medals, bool isDark) {
+    final unlocked = medals.where((m) => m.isUnlocked).toList();
+    if (unlocked.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 64,
+          child: Center(
+            child: ListView.builder(
+              shrinkWrap: true,
+              scrollDirection: Axis.horizontal,
+              itemCount: unlocked.length,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemBuilder: (context, index) {
+                final medal = unlocked[index];
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.05)
+                        : Colors.black.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.amber.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Tooltip(
+                    message: medal.title,
+                    child: Hero(
+                      tag: 'medal_${medal.id}',
+                      child: medal.unlockedAsset != null
+                          ? Image.asset(
+                              medal.unlockedAsset!,
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.contain,
+                            )
+                          : Icon(
+                              medal.iconData as IconData,
+                              size: 28,
+                              color: Colors.amber,
+                            ),
+                    ),
+                  ),
+                ).animate().scale(
+                  delay: (index * 100).ms,
+                  duration: 400.ms,
+                  curve: Curves.easeOutBack,
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
+

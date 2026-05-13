@@ -60,10 +60,13 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     final name = prefs.getString('playerName') ?? '';
     final geo = prefs.getString('geography') ?? 'global';
+    final hasConsent = prefs.containsKey('consentAccepted');
+    final consent = hasConsent ? prefs.getBool('consentAccepted') : null;
     
     SettingsState newState = state;
     if (name.isNotEmpty) newState = newState.copyWith(playerName: name);
     if (geo != 'global') newState = newState.copyWith(geography: geo);
+    if (hasConsent) newState = newState.copyWith(consentAccepted: consent);
     
     if (newState != state) {
       state = newState;
@@ -76,10 +79,6 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     );
   }
 
-  void setLocale(Locale locale) {
-    state = state.copyWith(locale: locale);
-  }
-
   void setTileScale(double scale) {
     state = state.copyWith(tileScale: scale);
   }
@@ -90,12 +89,16 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     await prefs.setString('geography', geo);
   }
 
-  void setConsent(bool accepted) {
+  void setConsent(bool accepted) async {
     state = state.copyWith(consentAccepted: accepted);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('consentAccepted', accepted);
   }
 
-  void resetConsent() {
+  void resetConsent() async {
     state = state.copyWith(clearConsent: true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('consentAccepted');
     // Reiniciar también el SDK de UMP
     ConsentInformation.instance.reset();
   }
@@ -116,6 +119,7 @@ final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>(
 });
 
 final translationsProvider = Provider<Translations>((ref) {
-  final settings = ref.watch(settingsProvider);
-  return Translations(settings.locale);
+  // Ignoramos el locale de settings y usamos directamente el del sistema
+  final systemLocale = PlatformDispatcher.instance.locale;
+  return Translations(systemLocale);
 });

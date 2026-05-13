@@ -4,14 +4,18 @@ class Medal {
   final String id;
   final String title;
   final String description;
-  final dynamic iconData; // IconData o Asset path
+  final dynamic iconData; // IconData (para Velocista) o null si usa assets
+  final String? unlockedAsset;
+  final String? lockedAsset;
   final bool isUnlocked;
 
   Medal({
     required this.id,
     required this.title,
     required this.description,
-    required this.iconData,
+    this.iconData,
+    this.unlockedAsset,
+    this.lockedAsset,
     this.isUnlocked = false,
   });
 
@@ -21,6 +25,8 @@ class Medal {
       title: title,
       description: description,
       iconData: iconData,
+      unlockedAsset: unlockedAsset,
+      lockedAsset: lockedAsset,
       isUnlocked: isUnlocked ?? this.isUnlocked,
     );
   }
@@ -31,13 +37,15 @@ final List<Medal> initialMedals = [
     id: 'first_step',
     title: 'Primer Paso',
     description: 'Completa tu primer nivel.',
-    iconData: Icons.emoji_events,
+    unlockedAsset: 'assets/images/trophies_final/trophy_first_step.png',
+    lockedAsset: 'assets/images/trophies_final/trophy_first_step_locked.png',
   ),
   Medal(
     id: 'math_genius',
     title: 'Genio Matemático',
     description: 'Llega al nivel 10.',
-    iconData: Icons.workspace_premium,
+    unlockedAsset: 'assets/images/trophies_final/trophy_math_genius.png',
+    lockedAsset: 'assets/images/trophies_final/trophy_math_genius_locked.png',
   ),
   Medal(
     id: 'speed_runner',
@@ -49,24 +57,28 @@ final List<Medal> initialMedals = [
     id: 'combo_king',
     title: 'Rey del Combo',
     description: 'Logra un combo de x5.',
-    iconData: Icons.bolt,
+    unlockedAsset: 'assets/images/trophies_final/trophy_combo_king.png',
+    lockedAsset: 'assets/images/trophies_final/trophy_combo_king_locked.png',
   ),
   Medal(
     id: 'expert_solver',
     title: 'Experto en Grillas',
     description: 'Completa un nivel en dificultad EXPERTO.',
-    iconData: Icons.military_tech,
+    unlockedAsset: 'assets/images/trophies_final/trophy_expert_solver.png',
+    lockedAsset: 'assets/images/trophies_final/trophy_expert_solver_locked.png',
   ),
   Medal(
     id: 'weekly_warrior',
     title: 'Guerrero Semanal',
     description: 'Juega 3 días en una misma semana.',
-    iconData: Icons.calendar_month,
+    unlockedAsset: 'assets/images/trophies_final/trophy_weekly_warrior.png',
+    lockedAsset: 'assets/images/trophies_final/trophy_weekly_warrior_locked.png',
   ),
   Medal(
     id: 'monthly_legend',
     title: 'Leyenda Mensual',
     description: 'Completa el desafío diario durante 15 días.',
-    iconData: Icons.stars,
+    unlockedAsset: 'assets/images/trophies_final/trophy_monthly_legend.png',
+    lockedAsset: 'assets/images/trophies_final/trophy_monthly_legend_locked.png',
   ),
 ];

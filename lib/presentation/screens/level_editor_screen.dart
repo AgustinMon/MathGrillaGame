@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/services.dart';
@@ -33,6 +34,34 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
   bool isDarkMode = true;
   List<dynamic> savedGrids = [];
   bool _showInstructions = true;
+  final List<List<GridCell>> _history = [];
+
+  void _saveToHistory() {
+    _history.add(
+      cells
+          .map(
+            (c) => GridCell(
+              x: c.x,
+              y: c.y,
+              type: c.type,
+              value: c.value,
+              isFixed: c.isFixed,
+              currentValue: c.currentValue,
+              isHorizontal: c.isHorizontal,
+            ),
+          )
+          .toList(),
+    );
+    if (_history.length > 30) _history.removeAt(0);
+  }
+
+  void _undo() {
+    if (_history.isNotEmpty) {
+      setState(() {
+        cells = _history.removeLast();
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -161,44 +190,38 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
 
   void _sanitizeGrid() {
     setState(() {
-      for (int i = 0; i < cells.length; i++) {
-        final cell = cells[i];
-        if (cell.type == CellType.operator || cell.type == CellType.equals) {
-          // Si es un operador o igual, debe tener vecinos
-          bool hasHorizontal = _isPartOfEquation(cell.x, cell.y, true);
-          bool hasVertical = _isPartOfEquation(cell.x, cell.y, false);
-          if (!hasHorizontal && !hasVertical) {
-            cells[i] = GridCell(x: cell.x, y: cell.y, type: CellType.empty);
+      // Identificamos todos los índices que forman parte de al menos una ecuación válida de 5 celdas
+      Set<int> usefulIndices = {};
+
+      // Horizontal
+      for (int y = 0; y < gridHeight; y++) {
+        for (int x = 0; x <= gridWidth - 5; x++) {
+          if (_checkEquationAt(x, y, true)) {
+            for (int i = 0; i < 5; i++) {
+              usefulIndices.add(y * gridWidth + (x + i));
+            }
           }
         }
       }
-    });
-  }
 
-  bool _isPartOfEquation(int x, int y, bool horizontal) {
-    int count = 0;
-    if (horizontal) {
-      for (int i = -4; i <= 4; i++) {
-        final c = _getCellAt(x + i, y);
-        if (c != null && c.type != CellType.empty) {
-          count++;
-          if (count >= 3) return true;
-        } else {
-          count = 0;
+      // Vertical
+      for (int x = 0; x < gridWidth; x++) {
+        for (int y = 0; y <= gridHeight - 5; y++) {
+          if (_checkEquationAt(x, y, false)) {
+            for (int i = 0; i < 5; i++) {
+              usefulIndices.add((y + i) * gridWidth + x);
+            }
+          }
         }
       }
-    } else {
-      for (int i = -4; i <= 4; i++) {
-        final c = _getCellAt(x, y + i);
-        if (c != null && c.type != CellType.empty) {
-          count++;
-          if (count >= 3) return true;
-        } else {
-          count = 0;
+
+      // Borramos cualquier celda que no sea "útil"
+      for (int i = 0; i < cells.length; i++) {
+        if (cells[i].type != CellType.empty && !usefulIndices.contains(i)) {
+          cells[i] = GridCell(x: cells[i].x, y: cells[i].y, type: CellType.empty);
         }
       }
-    }
-    return false;
+    });
   }
 
   String? _validateGridIntegrity() {
@@ -261,6 +284,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
   }
 
   void _onCellTap(int index) {
+    _saveToHistory();
     setState(() {
       final old = cells[index];
       if (old.type == selectedType && old.value == selectedValue) {
@@ -416,6 +440,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
                                 final cell = cells[index];
                                 return DragTarget<int>(
                                   onAcceptWithDetails: (details) {
+                                    _saveToHistory();
                                     setState(() {
                                       final fromIndex = details.data;
                                       final fromCell = cells[fromIndex];
@@ -516,6 +541,39 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
             onPressed: () => _showCalculator(l10n),
             backgroundColor: Colors.amber,
             child: const Icon(Icons.calculate, color: Colors.black),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.small(
+            heroTag: 'undo',
+            onPressed: _undo,
+            backgroundColor: Colors.blueGrey,
+            child: const Icon(Icons.undo, color: Colors.white),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.small(
+            heroTag: 'clear',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Borrar Todo'),
+                  content: const Text('¿Estás seguro de que quieres borrar toda la grilla?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                    TextButton(
+                      onPressed: () {
+                        _saveToHistory();
+                        _resetGrid();
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Borrar', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+            backgroundColor: Colors.redAccent,
+            child: const Icon(Icons.delete_sweep, color: Colors.white),
           ),
         ],
       ),
@@ -698,7 +756,7 @@ class _LevelEditorScreenState extends ConsumerState<LevelEditorScreen> {
                             '${l10n.text('grid_label')} ${g['width']}x${g['height']}',
                           ),
                           subtitle: Text(
-                            '${l10n.text('date_label')}: ${g['date'].toString().split('T')[0]}',
+                            '${l10n.text('date_label')}: ${DateFormat.yMd(Localizations.localeOf(context).toString()).format(DateTime.parse(g['date']))}',
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,

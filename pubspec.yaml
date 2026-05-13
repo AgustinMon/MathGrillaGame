@@ -46,6 +46,7 @@ dependencies:
   pdf: ^3.12.0
   printing: ^5.14.3
   url_launcher: ^6.3.1
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
@@ -72,13 +73,11 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/levels_easy.json
-    - assets/levels_medium.json
-    - assets/levels_hard.json
     - assets/levels/easy/
     - assets/levels/medium/
     - assets/levels/hard/
     - assets/images/
+    - assets/images/trophies_final/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

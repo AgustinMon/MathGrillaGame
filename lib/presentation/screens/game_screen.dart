@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -457,7 +458,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '${l10n.text('${state.difficulty}_mode')} ${state.levelNumber}',
+                    state.isDailyChallenge
+                        ? DateFormat.Md(Localizations.localeOf(context).toString())
+                            .format(DateTime.now())
+                        : '${l10n.text('${state.difficulty}_mode')} ${state.levelNumber}',
                     style: TextStyle(
                       color: textColor,
                       fontWeight: FontWeight.bold,
@@ -682,7 +686,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     return Container(
       color: isDark ? const Color(0xFF121212) : const Color(0xFFF4F6F9),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       width: double.infinity,
       child: Container(
         decoration: BoxDecoration(
@@ -734,17 +738,17 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   ? const SizedBox(width: double.infinity)
                   : Container(
                       constraints: const BoxConstraints(maxHeight: 350),
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
                       child: SingleChildScrollView(
                         child: Column(
                           children: [
                             if (footerTiles.isNotEmpty)
                               _buildTileGrid(footerTiles, isMachine: false),
                             if (machineTiles.isNotEmpty) ...[
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 8),
                               _buildTileGrid(machineTiles, isMachine: true),
                             ],
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 10),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -810,14 +814,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   Widget _buildTileGrid(List<String> tiles, {required bool isMachine}) {
     final screenSize = MediaQuery.of(context).size;
-    final double inventorySize = (screenSize.width / 9 * 0.85).clamp(
-      40.0,
-      50.0,
+    final double inventorySize = (screenSize.width / 9 * 0.82).clamp(
+      36.0,
+      46.0,
     );
 
     return Wrap(
-      spacing: 6,
-      runSpacing: 6,
+      spacing: 4,
+      runSpacing: 4,
       alignment: WrapAlignment.center,
       children: tiles.map((value) {
         return Draggable<Map<String, dynamic>>(
@@ -1195,9 +1199,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             const SizedBox(height: 40),
             ElevatedButton(
                   onPressed: () {
-                    ref
-                        .read(gameProvider.notifier)
-                        .startNewLevel(state.levelNumber + 1);
+                    if (state.levelNumber == 0) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => TutorialScreen()),
+                      );
+                    } else {
+                      ref
+                          .read(gameProvider.notifier)
+                          .startNewLevel(state.levelNumber + 1);
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amber,
@@ -1446,7 +1457,7 @@ class _ActionButton extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: bgColor,
               shape: BoxShape.circle,

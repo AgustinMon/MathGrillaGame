@@ -318,8 +318,9 @@ class GameNotifier extends StateNotifier<GameState> {
 
     // 2. Decidir qué celdas se quedan (fijas)
     Set<int> fixedIndices = {};
+    final random = Random();
 
-    // Los signos siempre se quedan
+    // Los signos siempre se quedan fijos
     for (int i = 0; i < playableCells.length; i++) {
       if (playableCells[i].type == CellType.operator ||
           playableCells[i].type == CellType.equals) {
@@ -327,14 +328,21 @@ class GameNotifier extends StateNotifier<GameState> {
       }
     }
 
-    // De cada ecuación, dejamos el RESULTADO (índice 4) y ocasionalmente un operando
-    // para facilitar la resolución en niveles diseñados manualmente.
-    final random = Random();
-    for (var eq in equationIndices) {
-      fixedIndices.add(eq[4]); // Siempre dejamos el resultado
-      if (random.nextDouble() < 0.3) {
-        fixedIndices.add(eq[0]); // Ocasionalmente el primer operando
+    // Identificamos todos los índices de números y dejamos solo el 30% como pistas fijas
+    List<int> numberIndices = [];
+    for (int i = 0; i < playableCells.length; i++) {
+      if (playableCells[i].type == CellType.number) {
+        numberIndices.add(i);
       }
+    }
+    
+    numberIndices.shuffle(random);
+    // Dejamos un 30% fijo, lo que garantiza un 70% de fichas vacías (en el inventario)
+    int fixedNumbersCount = (numberIndices.length * 0.3).floor();
+    if (fixedNumbersCount == 0 && numberIndices.isNotEmpty) fixedNumbersCount = 1;
+    
+    for (int i = 0; i < fixedNumbersCount; i++) {
+      fixedIndices.add(numberIndices[i]);
     }
 
     // 3. Procesar todas las celdas según la decisión
@@ -1154,6 +1162,10 @@ class GameNotifier extends StateNotifier<GameState> {
   /// Limpia la máquina cuando el resultado se usa en el tablero.
   void useMachineResult() {
     state = state.copyWith(clearMachineResult: true);
+  }
+
+  void resetStatistics() async {
+    await StatsRepository().resetStats();
   }
 
   @override

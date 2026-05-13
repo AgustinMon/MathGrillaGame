@@ -41,6 +41,11 @@ class MathTile extends ConsumerWidget {
       // Achicamos los números del inventario de 1 y 2 cifras (1 punto)
       fontSize -= 1;
     }
+
+    // Reducción adicional pedida por el usuario para tamaño normal y grande
+    if (settings.tileScale >= 1.0) {
+      fontSize -= 1;
+    }
     final bool isEmpty = value.trim().isEmpty;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;

@@ -39,11 +39,19 @@ class MedalsScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  medal.isUnlocked ? (medal.iconData as IconData) : Icons.lock,
-                  size: 60,
-                  color: medal.isUnlocked ? Colors.amber : theme.colorScheme.onSurface.withOpacity(0.2),
-                ),
+                if (medal.unlockedAsset != null)
+                  Image.asset(
+                    medal.isUnlocked ? medal.unlockedAsset! : medal.lockedAsset!,
+                    height: 100,
+                    width: 100,
+                    fit: BoxFit.contain,
+                  )
+                else
+                  Icon(
+                    medal.isUnlocked ? (medal.iconData as IconData) : Icons.lock,
+                    size: 60,
+                    color: medal.isUnlocked ? Colors.amber : theme.colorScheme.onSurface.withOpacity(0.2),
+                  ),
                 const SizedBox(height: 12),
                 Text(
                   medal.title,

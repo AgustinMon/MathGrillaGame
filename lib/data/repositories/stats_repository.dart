@@ -81,4 +81,16 @@ class StatsRepository {
       'hourData': prefs.getString(_hourDataKey) ?? '{}',
     };
   }
+
+  Future<void> resetStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_gamesPlayedKey);
+    await prefs.remove(_gamesWonKey);
+    await prefs.remove(_totalScoreKey);
+    await prefs.remove(_bestComboKey);
+    await prefs.remove(_totalTimeKey);
+    await prefs.remove(_bestTimeKey);
+    await prefs.remove(_bestTimeEqKey);
+    await prefs.remove(_hourDataKey);
+  }
 }

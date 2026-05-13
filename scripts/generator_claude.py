@@ -38,7 +38,7 @@ CONFIG = {
     "easy": {
         "size_range": (7, 9),
         "eq_range": (4, 6),
-        "levels": 50,
+        "levels": 100,
         "weights": [0.50, 0.30, 0.15, 0.05],
         "num_range": (1, 20),
         "min_r": 1,
@@ -50,7 +50,7 @@ CONFIG = {
     "medium": {
         "size_range": (10, 13),
         "eq_range": (8, 12),
-        "levels": 50,
+        "levels": 250,
         "weights": [0.30, 0.25, 0.30, 0.15],
         "num_range": (5, 50),
         "min_r": 5,
@@ -62,7 +62,7 @@ CONFIG = {
     "hard": {
         "size_range": (14, 17),
         "eq_range": (12, 18),
-        "levels": 50,
+        "levels": 150,
         "weights": [0.20, 0.20, 0.35, 0.25],
         "num_range": (10, 99),
         "min_r": 5,

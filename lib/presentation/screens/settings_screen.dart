@@ -37,12 +37,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final notifier = ref.read(settingsProvider.notifier);
 
     final l10n = ref.watch(translationsProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.text('settings_title')),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+    return Theme(
+      data: Theme.of(context).copyWith(
+        textTheme: Theme.of(context).textTheme.copyWith(
+          titleMedium: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14),
+          bodyMedium: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+          bodySmall: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
+        ),
       ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.text('settings_title')),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -68,21 +76,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ),
-
-          _buildSection(context, l10n.text('appearance_section')),
           ListTile(
-            title: Text(l10n.text('language_label')),
-            trailing: DropdownButton<String>(
-              value: settings.locale.languageCode,
-              items: const [
-                DropdownMenuItem(value: 'en', child: Text('English')),
-                DropdownMenuItem(value: 'es', child: Text('Español')),
-              ],
-              onChanged: (val) {
-                if (val != null) notifier.setLocale(Locale(val));
+            title: Text(l10n.text('reset_stats_label')),
+            trailing: TextButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(l10n.text('reset_stats_label')),
+                    content: Text(l10n.text('reset_stats_confirm')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(l10n.text('reject')),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          ref.read(gameProvider.notifier).resetStatistics();
+                          Navigator.pop(context);
+                        },
+                        child: Text(l10n.text('reset_button')),
+                      ),
+                    ],
+                  ),
+                );
               },
+              child: Text(
+                l10n.text('reset_button'),
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
           ),
+
+          _buildSection(context, l10n.text('appearance_section')),
           SwitchListTile(
             title: Text(l10n.text('dark_mode_label')),
             value: settings.themeMode == ThemeMode.dark,
@@ -138,8 +164,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         : l10n.text('rejected_status')),
             ),
             trailing: TextButton(
-              onPressed: () => notifier.resetConsent(),
-              child: Text(l10n.text('reset_button')),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(l10n.text('reset_consent_label')),
+                    content: Text(l10n.text('reset_consent_confirm')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(l10n.text('reject')),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          notifier.resetConsent();
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.text('reset_consent_success')),
+                              backgroundColor: AppTheme.primaryBlue,
+                            ),
+                          );
+                        },
+                        child: Text(l10n.text('reset_button')),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Text(
+                l10n.text('reset_button'),
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
           ),
           ListTile(
@@ -177,7 +233,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
                 l10n.text('simulate_geo_label'),
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 10),
               ),
             ),
             Row(
@@ -239,8 +295,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSection(BuildContext context, String title) {
     return Padding(
@@ -248,7 +305,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          fontSize: 14,
+          fontSize: 12,
           fontWeight: FontWeight.bold,
           color: Theme.of(context).brightness == Brightness.light
               ? Colors.black
@@ -286,6 +343,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             style: TextStyle(
               color: isSelected ? Colors.black : theme.colorScheme.onSurface,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 12,
             ),
           ),
         ),
@@ -319,7 +377,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: isSelected ? Colors.black : theme.colorScheme.onSurface,
-              fontSize: 10,
+              fontSize: 8,
               fontWeight: FontWeight.bold,
             ),
           ),
