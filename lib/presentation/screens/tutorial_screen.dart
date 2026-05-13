@@ -47,7 +47,9 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         title: Text(
           l10n.text('privacy_title'),
           style: TextStyle(
@@ -152,14 +154,6 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      _buildHeaderAction(
-                        Icons.emoji_events_outlined,
-                        Colors.amber[700]!,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => MedalsScreen()),
-                        ),
-                      ),
                       const SizedBox(width: 12),
                       _buildHeaderAction(
                         Icons.settings_outlined,
@@ -217,11 +211,73 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
                   const SizedBox(height: 24),
 
+                  // Label "OTRAS FORMAS DE JUGAR"
+                  Text(
+                    l10n.text('other_ways_to_play'),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      color: primaryColor.withOpacity(0.3),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Modo Optimizar
+                  _buildThemedCardAction(
+                    l10n.text('optimize_mode_title'),
+                    null,
+                    const Color(0xFF10B981),
+                    cardBg,
+                    isDark,
+                    () {
+                      ref.read(gameProvider.notifier).startOptimizeLevel(1);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GameScreen(),
+                        ),
+                      );
+                    },
+                    tag: l10n.text('challenge_tag'),
+                    customIcon: Container(
+                      width: 24,
+                      height: 24,
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 24,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade400,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          Center(
+                            child: Container(
+                              width: 6,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade400,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
                   // Acciones secundarias
                   _buildThemedCardAction(
                     l10n.text('game_of_the_day'),
                     Icons.calendar_today_rounded,
-                    const Color(0xFFF59E0B),
+                    Colors.amber.shade400,
                     cardBg,
                     isDark,
                     () {
@@ -238,7 +294,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                   _buildThemedCardAction(
                     l10n.text('my_grids'),
                     Icons.auto_awesome_motion_rounded,
-                    const Color(0xFF8B5CF6),
+                    Colors.amber.shade400,
                     cardBg,
                     isDark,
                     () => _showMyGridsList(context, l10n),
@@ -252,7 +308,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                       Expanded(
                         child: _buildSimpleModeButton(
                           l10n.text('explain_me'),
-                          Icons.psychology_outlined,
+                          Icons.help_outline_rounded,
                           isDark ? Colors.white54 : const Color(0xFF64748B),
                           () => Navigator.push(
                             context,
@@ -267,7 +323,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                         child: _buildSimpleModeButton(
                           l10n.text('editor'),
                           Icons.edit_rounded,
-                          isDark ? Colors.white54 : const Color(0xFF64748B),
+                          Colors.amber.shade600,
                           () => Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -279,12 +335,6 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 16),
-                  // Decoración de Medallas Desbloqueadas
-                  _buildUnlockedMedalsCarousel(
-                    ref.watch(gameProvider).medals,
-                    isDark,
-                  ),
 
                   const Spacer(flex: 2),
 
@@ -294,6 +344,10 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                       showDialog(
                         context: context,
                         builder: (context) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: isDark ? BorderSide.none : const BorderSide(color: Colors.black, width: 3),
+                          ),
                           title: Text(l10n.text('privacy_policy_title')),
                           content: SingleChildScrollView(
                             child: Text(l10n.text('privacy_policy_content')),
@@ -350,6 +404,7 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(24),
+        border: isDark ? null : Border.all(color: Colors.black, width: 3),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
@@ -441,56 +496,108 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
   Widget _buildThemedCardAction(
     String label,
-    IconData icon,
+    IconData? icon,
     Color color,
     Color cardBg,
     bool isDark,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    VoidCallback onTap, {
+    String? tag,
+    Widget? customIcon,
+  }) {
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 64,
+            clipBehavior: Clip.antiAlias, // Clip the ribbon
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(20),
+              border: isDark ? null : Border.all(color: Colors.black, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
+            child: Stack(
+              alignment: Alignment.center, // Center contents vertically
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (customIcon != null)
+                      customIcon
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon!, color: color, size: 26),
+                      ),
+                    const SizedBox(width: 16),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: isDark ? Colors.white12 : Colors.black12,
+                    ),
+                  ],
+                ),
               ),
-              child: Icon(icon, color: color, size: 20),
+                if (tag != null)
+                  Positioned(
+                    right: -25,
+                    top: 10,
+                    child: Transform.rotate(
+                      angle: 0.785398, // 45 degrees
+                      child: Container(
+                        width: 100,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade400,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            tag,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: TextStyle(
-                color: isDark ? Colors.white : const Color(0xFF1E293B),
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: isDark ? Colors.white12 : Colors.black12,
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -507,7 +614,12 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
       style: TextButton.styleFrom(
         foregroundColor: color,
         padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: Theme.of(context).brightness == Brightness.dark 
+              ? BorderSide.none 
+              : const BorderSide(color: Colors.black, width: 2),
+        ),
       ),
     );
   }

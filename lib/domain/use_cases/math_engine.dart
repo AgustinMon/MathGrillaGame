@@ -7,10 +7,9 @@ import '../entities/puzzle_level.dart';
 class MathEngine {
   static final Random _random = Random();
   static final Map<String, List<PuzzleLevel>> _levelsByDifficulty = {
-    'easy': [],
-    'medium': [],
     'hard': [],
   };
+  static final List<PuzzleLevel> _optimizeLevels = [];
 
   /// Carga los niveles pre-diseñados desde los archivos JSON de assets.
   static Future<void> loadLevels() async {
@@ -29,11 +28,31 @@ class MathEngine {
       _levelsByDifficulty['medium'] = _parseAndFilter(mediumData);
       _levelsByDifficulty['hard'] = _parseAndFilter(hardData);
 
+      await loadOptimizeLevels();
+
       debugPrint(
         '✅ CRUCIMATH: Niveles fijos cargados y filtrados (máx 3 cifras).',
       );
     } catch (e) {
       debugPrint('❌ Error cargando niveles: $e');
+    }
+  }
+
+  static Future<void> loadOptimizeLevels() async {
+    try {
+      final optimizeData = await rootBundle.loadString(
+        'assets/levels/optimize/levels_medium_optimize.json',
+      );
+      final decoded = json.decode(optimizeData);
+      if (decoded is List) {
+        _optimizeLevels.clear();
+        for (var l in decoded) {
+          _optimizeLevels.add(PuzzleLevel.fromJson(Map<String, dynamic>.from(l)));
+        }
+        debugPrint('✅ CRUCIMATH: ${_optimizeLevels.length} niveles optimize cargados.');
+      }
+    } catch (e) {
+      debugPrint('❌ Error cargando niveles optimize: $e');
     }
   }
 
@@ -78,6 +97,17 @@ class MathEngine {
   /// Retorna la cantidad de niveles disponibles para una dificultad.
   static int getLevelsCount(String difficulty) {
     return _levelsByDifficulty[difficulty]?.length ?? 0;
+  }
+
+  static int getOptimizeLevelsCount() {
+    return _optimizeLevels.length;
+  }
+
+  static PuzzleLevel? getOptimizeLevel(int levelId) {
+    if (levelId > 0 && levelId <= _optimizeLevels.length) {
+      return _optimizeLevels[levelId - 1];
+    }
+    return null;
   }
 
   /// Genera o recupera un nivel según el [levelId] y la [difficulty].

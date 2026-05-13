@@ -120,6 +120,7 @@ Email: contactaamforge@gmail.com''',
       'reset_consent_label': 'Reset Consent',
       'reset_consent_confirm': 'This will reset your privacy and ad preferences. Continue?',
       'reset_consent_success': 'Consent preferences have been reset.',
+      'other_ways_to_play': 'OTHER WAYS TO PLAY',
     },
     'es': {
       'app_title': 'CRUCIMATH',
@@ -236,10 +237,19 @@ Email: contactaamforge@gmail.com''',
       'reset_consent_label': 'Resetear Consentimiento',
       'reset_consent_confirm': 'Esto reseteará tus preferencias de privacidad y anuncios. ¿Continuar?',
       'reset_consent_success': 'Preferencias de consentimiento reseteadas.',
+      'optimize_mode_title': 'JUGAR SUMA MÁXIMA',
+      'optimum_score_label': 'PUNTAJE ÓPTIMO',
+      'your_score_label': 'TU PUNTAJE',
+      'challenge_tag': 'DESAFÍO',
+      'optimize_intro_title': '¿Cómo jugar Suma Máxima?',
+      'optimize_intro_content': 'Completa la grilla y consigue el mayor puntaje posible. ¡Encuentra la combinación que más sume!',
+      'optimum_combination': 'COMBINACIÓN ÓPTIMA',
+      'other_ways_to_play': 'OTRAS FORMAS DE JUGAR',
     },
   };
 
   String text(String key) {
+    // Si no es español, forzamos inglés como base
     final lang = locale.languageCode == 'es' ? 'es' : 'en';
     return _localizedValues[lang]?[key] ?? key;
   }

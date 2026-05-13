@@ -76,6 +76,7 @@ flutter:
     - assets/levels/easy/
     - assets/levels/medium/
     - assets/levels/hard/
+    - assets/levels/optimize/
     - assets/images/
     - assets/images/trophies_final/
 

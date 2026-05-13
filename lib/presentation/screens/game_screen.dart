@@ -20,6 +20,7 @@ import '../../core/utils/translations.dart';
 /// Pantalla principal del juego donde se muestra la cuadrícula y se interactúa con las piezas.
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../../domain/use_cases/math_engine.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
@@ -35,6 +36,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   RewardedAd? _rewardedAd;
   bool _isAdLoaded = false;
   bool _isInventoryCollapsed = false;
+  bool _optimizeIntroShown = false;
 
   @override
   void initState() {
@@ -208,6 +210,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               // Superposición visual que se muestra al ganar el nivel.
               if (gameState.isLevelComplete)
                 _buildVictoryOverlay(gameState, l10n),
+
+              // Marcador flotante de puntaje en modo optimizar
+              if (gameState.isOptimizeMode && !gameState.isLevelComplete)
+                Positioned(
+                  top: 150,
+                  right: 16,
+                  child: _buildOptimizeFloatingBadge(gameState, l10n),
+                ),
 
               // Mensaje central animado (reemplaza SnackBar)
               if (gameState.message != null)
@@ -430,13 +440,46 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   ),
                 ],
               ),
-              buildCircularButton(
-                Icons.settings_outlined,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                Row(
+                  children: [
+                    if (state.isOptimizeMode)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ElevatedButton(
+                          onPressed: () {
+                             ref.read(gameProvider.notifier).finishOptimizeLevel();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('FINALIZAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    if (state.isOptimizeMode)
+                      buildCircularButton(
+                        Icons.add_rounded,
+                        () => _showOptimizeIntro(context, l10n),
+                      ),
+                    const SizedBox(width: 8),
+                    buildCircularButton(
+                      Icons.bug_report_outlined,
+                      () => ref.read(gameProvider.notifier).debugSolve(),
+                    ),
+                    const SizedBox(width: 8),
+                    buildCircularButton(
+                      Icons.settings_outlined,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -458,10 +501,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    state.isDailyChallenge
-                        ? DateFormat.Md(Localizations.localeOf(context).toString())
-                            .format(DateTime.now())
-                        : '${l10n.text('${state.difficulty}_mode')} ${state.levelNumber}',
+                    state.isOptimizeMode 
+                      ? 'SUMA MÁXIMA'
+                      : (state.isDailyChallenge
+                          ? DateFormat.Md(Localizations.localeOf(context).toString())
+                              .format(DateTime.now())
+                          : '${l10n.text('${state.difficulty}_mode')} ${state.levelNumber}'),
                     style: TextStyle(
                       color: textColor,
                       fontWeight: FontWeight.bold,
@@ -1113,10 +1158,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   Widget _buildVictoryOverlay(GameState state, Translations l10n) {
     return Container(
-      color: Colors.black.withOpacity(0.85),
+      color: Colors.black.withOpacity(0.6),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: state.isOptimizeMode ? const Color(0xFF10B981) : Colors.amber,
+              width: 3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 30,
+                spreadRadius: 5,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               alignment: Alignment.center,
@@ -1196,13 +1259,24 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ),
               ],
             ).animate().fadeIn(delay: 500.ms).scale(),
+            if (state.isOptimizeMode) _buildOptimizeResult(state, l10n),
             const SizedBox(height: 40),
             ElevatedButton(
                   onPressed: () {
-                    if (state.levelNumber == 0) {
+                    if (state.isOptimizeMode) {
+                      final next = state.levelNumber + 1;
+                      if (next <= MathEngine.getOptimizeLevelsCount()) {
+                        ref.read(gameProvider.notifier).startOptimizeLevel(next);
+                      } else {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TutorialScreen()),
+                        );
+                      }
+                    } else if (state.levelNumber == 0) {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => TutorialScreen()),
+                        MaterialPageRoute(builder: (_) => const TutorialScreen()),
                       );
                     } else {
                       ref
@@ -1238,7 +1312,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           ],
         ),
       ),
-    ).animate().fadeIn(duration: 400.ms);
+    )).animate().fadeIn(duration: 400.ms);
   }
 
   /// Muestra el diálogo cuando el jugador pierde todas las vidas o se queda sin tiempo.
@@ -1386,6 +1460,147 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ],
       ),
     );
+  }
+
+  void _showOptimizeIntro(BuildContext context, Translations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF10B981), width: 2),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.add_rounded, color: Color(0xFF10B981), size: 28),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                l10n.text('optimize_intro_title'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white, 
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          l10n.text('optimize_intro_content'),
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              l10n.text('understood_button'),
+              style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptimizeResult(GameState state, Translations l10n) {
+    final scoring = state.currentLevel?.scoring;
+    int stars = 0;
+    double percentage = 0;
+    final int optimum = state.optimumScore > 0 ? state.optimumScore : 1;
+
+    if (scoring != null) {
+      final thresholds = scoring.thresholds;
+      percentage = (state.score / scoring.maxScore) * 100;
+      if (state.score >= (thresholds['three_stars'] ?? scoring.maxScore)) {
+        stars = 3;
+      } else if (state.score >= (thresholds['two_stars'] ?? (scoring.maxScore * 0.8).toInt())) {
+        stars = 2;
+      } else if (state.score >= (thresholds['one_star'] ?? (scoring.maxScore * 0.5).toInt())) {
+        stars = 1;
+      }
+    } else {
+      percentage = (state.score / optimum) * 100;
+      if (percentage >= 99.9) stars = 3;
+      else if (percentage >= 80) stars = 2;
+      else if (percentage >= 50) stars = 1;
+    }
+
+    return Column(
+      children: [
+        Text(
+          '${l10n.text('your_score_label')}: ${state.score}',
+          style: const TextStyle(
+            color: Colors.white, 
+            fontSize: 28, 
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${l10n.text('optimum_score_label')}: $optimum (${percentage.toStringAsFixed(1)}%)',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8), 
+            fontSize: 18, 
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (index) {
+            final hasStar = index < stars;
+            return Icon(
+              hasStar ? Icons.star_rounded : Icons.star_outline_rounded,
+              color: hasStar ? Colors.amber : Colors.white24,
+              size: 56,
+            ).animate(delay: (index * 200).ms).scale(
+              begin: const Offset(0, 0),
+              end: const Offset(1, 1),
+              curve: Curves.elasticOut,
+              duration: 600.ms,
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOptimizeFloatingBadge(GameState state, Translations l10n) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            '${state.score} / ${state.optimumScore}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    ).animate().slideX(begin: 1, end: 0, curve: Curves.easeOutBack, duration: 500.ms);
   }
 }
 
