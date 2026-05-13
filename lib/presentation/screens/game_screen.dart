@@ -1385,7 +1385,12 @@ class _StatItem extends StatelessWidget {
   final bool isWarning;
   final Color? color;
 
-  const _StatItem({required this.label, required this.value});
+  const _StatItem({
+    required this.label,
+    required this.value,
+    this.isWarning = false,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
