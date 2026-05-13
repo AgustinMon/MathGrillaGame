@@ -59,6 +59,8 @@ class GameState {
   final bool isOptimizeMode;
   final int optimumScore;
   final bool isDebugging;
+  final String? debugInfo;
+  final int? lastLevelId;
 
   GameState({
     this.currentLevel,
@@ -100,6 +102,8 @@ class GameState {
     this.isOptimizeMode = false,
     this.optimumScore = 0,
     this.isDebugging = false,
+    this.debugInfo,
+    this.lastLevelId,
   });
 
   /// Crea una copia del estado actual permitiendo modificar solo algunos campos.
@@ -146,6 +150,8 @@ class GameState {
     bool? isOptimizeMode,
     int? optimumScore,
     bool? isDebugging,
+    String? debugInfo,
+    int? lastLevelId,
   }) {
     return GameState(
       currentLevel: currentLevel ?? this.currentLevel,
@@ -197,6 +203,8 @@ class GameState {
       isOptimizeMode: isOptimizeMode ?? this.isOptimizeMode,
       optimumScore: optimumScore ?? this.optimumScore,
       isDebugging: isDebugging ?? this.isDebugging,
+      debugInfo: debugInfo ?? this.debugInfo,
+      lastLevelId: lastLevelId ?? this.lastLevelId,
     );
   }
 
@@ -277,6 +285,9 @@ class GameNotifier extends StateNotifier<GameState> {
       machineInputBFromMachine: false,
       comboCount: 0,
       lastSolveTime: null,
+      debugInfo: null,
+      lastLevelId: level,
+      isOptimizeMode: false,
     );
     _startTimer();
     _checkWinCondition();
@@ -472,6 +483,8 @@ class GameNotifier extends StateNotifier<GameState> {
       message: '¡Busca el Puntaje Máximo!',
       hintsRemaining: 3,
       isTimerPaused: false,
+      debugInfo: null,
+      lastLevelId: customLevel.id,
     );
     _startTimer();
   }
@@ -782,21 +795,25 @@ class GameNotifier extends StateNotifier<GameState> {
         StatsRepository().updateBestCombo(newCombo);
 
         if (isHorizontal) {
+          final optimizeData = state.isOptimizeMode ? _getOptimizeTotalScore() : null;
           state = state.copyWith(
             solvedRows: {...state.solvedRows, cells[0].y},
             solvedCells: newSolvedCells,
-            score: state.isOptimizeMode ? _getOptimizeTotalScore() : state.score + points,
+            score: state.isOptimizeMode ? optimizeData!.score : state.score + points,
+            debugInfo: state.isOptimizeMode ? optimizeData!.debugInfo : state.debugInfo,
             comboCount: newCombo,
             lastSolveTime: now,
             message: state.isOptimizeMode ? null : (newCombo > 1 ? 'COMBO x$newCombo! +$points' : '¡Excelente!'),
             timeLeft: state.isOptimizeMode ? state.timeLeft : state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
           );
         } else {
+          final optimizeData = state.isOptimizeMode ? _getOptimizeTotalScore() : null;
           state = state.copyWith(
             solvedCols: {...state.solvedCols, cells[0].x},
             solvedCells: newSolvedCells,
-            score: state.isOptimizeMode ? _getOptimizeTotalScore() : state.score + points,
-            comboCount: newCombo,
+            score: state.isOptimizeMode ? optimizeData!.score : state.score + points,
+            debugInfo: state.isOptimizeMode ? optimizeData!.debugInfo : state.debugInfo,
+            comboCount: state.isOptimizeMode ? 0 : newCombo,
             lastSolveTime: now,
             message: state.isOptimizeMode ? null : (newCombo > 1 ? 'COMBO x$newCombo! +$points' : '¡Excelente!'),
             timeLeft: state.isOptimizeMode ? state.timeLeft : state.timeLeft + (state.difficulty == 'easy' ? 0 : 10),
@@ -907,7 +924,11 @@ class GameNotifier extends StateNotifier<GameState> {
     // Condición de victoria: todas las celdas que NO están vacías deben estar en newlySolvedCells
     if (state.isOptimizeMode) {
       // En modo optimizar, el puntaje es la suma de los resultados de las ecuaciones válidas
-      state = state.copyWith(score: _getOptimizeTotalScore());
+      final optimizeData = _getOptimizeTotalScore();
+      state = state.copyWith(
+        score: optimizeData.score,
+        debugInfo: optimizeData.debugInfo,
+      );
       return; 
     }
 
@@ -1339,13 +1360,15 @@ class GameNotifier extends StateNotifier<GameState> {
     await StatsRepository().resetStats();
   }
 
-  int _getOptimizeTotalScore() {
-    if (state.currentLevel == null) return 0;
+  _OptimizeResult _getOptimizeTotalScore() {
+    if (state.currentLevel == null) return const _OptimizeResult(0, "");
     
     int totalSum = 0;
     final cells = state.currentLevel!.cells;
     final size = state.currentLevel!.size;
-    final Set<String> validEquations = {}; // Para evitar duplicar si se cruzan
+    final Set<String> validEquations = {}; 
+    final List<String> debugList = [];
+    final List<String> invalidList = [];
 
     // Scan rows
     for (int y = 0; y < size; y++) {
@@ -1353,12 +1376,26 @@ class GameNotifier extends StateNotifier<GameState> {
         ..sort((a, b) => a.x.compareTo(b.x));
       for (int i = 0; i <= row.length - 5; i++) {
         final sub = row.sublist(i, i + 5);
-        if (sub[3].type == CellType.equals && _isMathCorrect(sub)) {
-           final key = "h_${sub[0].x}_${sub[0].y}";
-           if (!validEquations.contains(key)) {
-             final resVal = int.tryParse(sub[4].currentValue ?? sub[4].value ?? '0') ?? 0;
-             totalSum += resVal;
-             validEquations.add(key);
+        if (sub[3].type == CellType.equals) {
+           final valA = sub[0].currentValue ?? sub[0].value ?? "?";
+           final valB = sub[2].currentValue ?? sub[2].value ?? "?";
+           final valRes = sub[4].currentValue ?? sub[4].value ?? "?";
+           final op = sub[1].value ?? "?";
+           final eqStr = "$valA$op$valB=$valRes";
+
+           if (_isMathCorrect(sub)) {
+             final key = "h_${sub[0].x}_${sub[0].y}";
+             if (!validEquations.contains(key)) {
+               final resVal = int.tryParse(valRes) ?? 0;
+               totalSum += resVal;
+               validEquations.add(key);
+               debugList.add("H:$eqStr");
+             }
+           } else {
+             // Solo si está completa la mostramos como inválida para no saturar
+             if (valA != "?" && valB != "?" && valRes != "?") {
+               invalidList.add("H-INV:$eqStr");
+             }
            }
         }
       }
@@ -1370,32 +1407,74 @@ class GameNotifier extends StateNotifier<GameState> {
         ..sort((a, b) => a.y.compareTo(b.y));
       for (int i = 0; i <= col.length - 5; i++) {
         final sub = col.sublist(i, i + 5);
-        if (sub[3].type == CellType.equals && _isMathCorrect(sub)) {
-           final key = "v_${sub[0].x}_${sub[0].y}";
-           if (!validEquations.contains(key)) {
-             final resVal = int.tryParse(sub[4].currentValue ?? sub[4].value ?? '0') ?? 0;
-             totalSum += resVal;
-             validEquations.add(key);
+        if (sub[3].type == CellType.equals) {
+           final valA = sub[0].currentValue ?? sub[0].value ?? "?";
+           final valB = sub[2].currentValue ?? sub[2].value ?? "?";
+           final valRes = sub[4].currentValue ?? sub[4].value ?? "?";
+           final op = sub[1].value ?? "?";
+           final eqStr = "$valA$op$valB=$valRes";
+
+           if (_isMathCorrect(sub)) {
+             final key = "v_${sub[0].x}_${sub[0].y}";
+             if (!validEquations.contains(key)) {
+               final resVal = int.tryParse(valRes) ?? 0;
+               totalSum += resVal;
+               validEquations.add(key);
+               debugList.add("V:$eqStr");
+             }
+           } else {
+             if (valA != "?" && valB != "?" && valRes != "?") {
+               invalidList.add("V-INV:$eqStr");
+             }
            }
         }
       }
     }
     
-    return totalSum;
+    String info = "VALID: ${debugList.join(", ")}";
+    if (invalidList.isNotEmpty) {
+      info += " | INVALID: ${invalidList.join(", ")}";
+    }
+    
+    return _OptimizeResult(totalSum, info);
   }
 
-  void finishOptimizeLevel() {
+  Future<void> finishOptimizeLevel() async {
     if (!state.isOptimizeMode) return;
     
     // Recalculamos el puntaje final
-    final finalScore = _getOptimizeTotalScore();
+    final optimizeData = _getOptimizeTotalScore();
+    
+    // Guardamos el progreso
+    final statsRepo = StatsRepository();
+    await statsRepo.saveOptimizeProgress(state.levelNumber);
     
     // Marcamos el nivel como completo para mostrar el modal de victoria
     state = state.copyWith(
-      score: finalScore,
+      score: optimizeData.score,
+      debugInfo: optimizeData.debugInfo,
       isLevelComplete: true,
-      message: '¡Puntaje Final: $finalScore!',
+      message: '¡Puntaje Final: ${optimizeData.score}!',
     );
+    
+    // Verificar hitos de medallas
+    final totalLevels = MathEngine.getOptimizeLevelsCount();
+    if (totalLevels > 0) {
+      final percentage = (state.levelNumber / totalLevels) * 100;
+      final medalRepo = MedalRepository();
+      
+      if (percentage >= 100) {
+        await medalRepo.unlockMedal('optimize_100');
+        state = state.copyWith(message: '¡ERES UNA LEYENDA! Has completado Crucimath Optimize.');
+      } else if (percentage >= 75) {
+        await medalRepo.unlockMedal('optimize_75');
+      } else if (percentage >= 50) {
+        await medalRepo.unlockMedal('optimize_50');
+      } else if (percentage >= 25) {
+        await medalRepo.unlockMedal('optimize_25');
+      }
+      _loadMedals(); // Recargar medallas en el estado
+    }
     
     SoundService.playSuccess();
     HapticFeedback.heavyImpact();
@@ -1406,6 +1485,12 @@ class GameNotifier extends StateNotifier<GameState> {
     _timer?.cancel();
     super.dispose();
   }
+}
+
+class _OptimizeResult {
+  final int score;
+  final String debugInfo;
+  const _OptimizeResult(this.score, this.debugInfo);
 }
 
 /// Proveedor global para acceder al estado y lógica del juego desde la UI.

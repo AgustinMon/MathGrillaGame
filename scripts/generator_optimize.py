@@ -60,7 +60,7 @@ CONFIG = {
         "min_distinct":DEDUCTIVE_CONFIG["medium"]["min_distinct"],
 
         # Específicas de optimize
-        "levels": 50,
+        "levels": 100,
         "solutions_range": (5, 20),
         # Pistas: queremos POCAS, para que haya varias configs válidas
         "min_clues_ratio": 0.10,

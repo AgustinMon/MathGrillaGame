@@ -81,4 +81,28 @@ final List<Medal> initialMedals = [
     unlockedAsset: 'assets/images/trophies_final/trophy_monthly_legend.png',
     lockedAsset: 'assets/images/trophies_final/trophy_monthly_legend_locked.png',
   ),
+  Medal(
+    id: 'optimize_25',
+    title: 'Aprendiz de Optimizador',
+    description: 'Completa el 25% de los niveles de Optimización.',
+    iconData: Icons.trending_up_rounded,
+  ),
+  Medal(
+    id: 'optimize_50',
+    title: 'Estratega de Sumas',
+    description: 'Completa el 50% de los niveles de Optimización.',
+    iconData: Icons.psychology_rounded,
+  ),
+  Medal(
+    id: 'optimize_75',
+    title: 'Maestro del Cálculo',
+    description: 'Completa el 75% de los niveles de Optimización.',
+    iconData: Icons.workspace_premium_rounded,
+  ),
+  Medal(
+    id: 'optimize_100',
+    title: 'Leyenda de la Grilla',
+    description: '¡Has completado todos los niveles de Optimización!',
+    iconData: Icons.military_tech_rounded,
+  ),
 ];

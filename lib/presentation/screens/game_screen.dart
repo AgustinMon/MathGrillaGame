@@ -218,6 +218,25 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   right: 16,
                   child: _buildOptimizeFloatingBadge(gameState, l10n),
                 ),
+              
+              // Información de DEBUG (solo para testing)
+              if (kDebugMode && gameState.debugInfo != null)
+                Positioned(
+                  bottom: 150,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      "DEBUG: ${gameState.debugInfo}",
+                      style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontFamily: 'monospace'),
+                    ),
+                  ),
+                ),
 
               // Mensaje central animado (reemplaza SnackBar)
               if (gameState.message != null)
@@ -442,7 +461,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               ),
                 Row(
                   children: [
-                    if (state.isOptimizeMode)
+                    if (kDebugMode && state.isOptimizeMode)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ElevatedButton(
@@ -466,10 +485,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                         () => _showOptimizeIntro(context, l10n),
                       ),
                     const SizedBox(width: 8),
-                    buildCircularButton(
-                      Icons.bug_report_outlined,
-                      () => ref.read(gameProvider.notifier).debugSolve(),
-                    ),
+                    if (kDebugMode)
+                      buildCircularButton(
+                        Icons.bug_report_outlined,
+                        () => ref.read(gameProvider.notifier).debugSolve(),
+                      ),
                     const SizedBox(width: 8),
                     buildCircularButton(
                       Icons.settings_outlined,
@@ -513,10 +533,22 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                       fontSize: 16,
                     ),
                   ),
+                  if (kDebugMode && state.lastLevelId != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        'ID: ${state.lastLevelId}',
+                        style: TextStyle(
+                          color: textColor.withOpacity(0.5),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                 ],
               ),
               // Cartel de Combo en el centro (si aplica)
-              if (state.comboCount > 1)
+              if (state.comboCount > 1 && !state.isOptimizeMode)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1161,8 +1193,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       color: Colors.black.withOpacity(0.6),
       child: Center(
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 24),
-          padding: const EdgeInsets.all(30),
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           decoration: BoxDecoration(
             color: const Color(0xFF1E293B),
             borderRadius: BorderRadius.circular(30),
@@ -1220,25 +1252,27 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     ),
               ],
             ),
-            const SizedBox(height: 30),
-            Text(
-                  l10n.text('victory'),
-                  style: GoogleFonts.roboto(
-                    fontSize: 60,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.amber,
-                    letterSpacing: 4,
-                    shadows: [
-                      const Shadow(
-                        color: Colors.orange,
-                        blurRadius: 30,
-                        offset: Offset(4, 4),
-                      ),
-                      const Shadow(color: Colors.white, blurRadius: 10),
-                    ],
+            const SizedBox(height: 20),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                    l10n.text('victory'),
+                    style: GoogleFonts.roboto(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.amber,
+                      letterSpacing: 4,
+                      shadows: [
+                        const Shadow(
+                          color: Colors.orange,
+                          blurRadius: 30,
+                          offset: Offset(4, 4),
+                        ),
+                        const Shadow(color: Colors.white, blurRadius: 10),
+                      ],
+                    ),
                   ),
-                )
-                .animate()
+            ).animate()
                 .scale(duration: 800.ms, curve: Curves.elasticOut)
                 .then()
                 .shimmer(duration: 1.5.seconds, color: Colors.white),
@@ -1260,7 +1294,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               ],
             ).animate().fadeIn(delay: 500.ms).scale(),
             if (state.isOptimizeMode) _buildOptimizeResult(state, l10n),
-            const SizedBox(height: 40),
+            const SizedBox(height: 24),
             ElevatedButton(
                   onPressed: () {
                     if (state.isOptimizeMode) {
@@ -1574,9 +1608,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF10B981),
+        color: Colors.amber,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(color: Colors.black, width: 2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.3),
@@ -1588,12 +1622,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+          const Icon(Icons.stars_rounded, color: Colors.black, size: 18),
           const SizedBox(width: 6),
           Text(
             '${state.score} / ${state.optimumScore}',
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.black,
               fontWeight: FontWeight.w900,
               fontSize: 15,
             ),

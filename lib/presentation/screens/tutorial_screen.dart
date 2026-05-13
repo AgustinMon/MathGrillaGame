@@ -14,6 +14,8 @@ import 'medals_screen.dart';
 import 'explain_me_screen.dart';
 import 'level_editor_screen.dart';
 import 'stats_screen.dart';
+import '../../data/repositories/stats_repository.dart';
+import '../../domain/use_cases/math_engine.dart';
 
 class TutorialScreen extends ConsumerStatefulWidget {
   const TutorialScreen({super.key});
@@ -154,6 +156,16 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
+                      _buildHeaderAction(
+                        Icons.emoji_events_outlined,
+                        Colors.amber.shade600,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MedalsScreen(),
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       _buildHeaderAction(
                         Icons.settings_outlined,
@@ -231,14 +243,25 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
                     const Color(0xFF10B981),
                     cardBg,
                     isDark,
-                    () {
-                      ref.read(gameProvider.notifier).startOptimizeLevel(1);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const GameScreen(),
-                        ),
-                      );
+                    () async {
+                      final statsRepo = StatsRepository();
+                      final lastLevel = await statsRepo.getLastCompletedOptimizeLevel();
+                      final totalLevels = MathEngine.getOptimizeLevelsCount();
+                      
+                      // Si ya terminó todo, vuelve al 1 o se queda en el último. 
+                      // Por ahora, si terminó el 100, que juegue el 100 de nuevo o el 1.
+                      int levelToStart = lastLevel + 1;
+                      if (levelToStart > totalLevels) levelToStart = 1;
+                      
+                      ref.read(gameProvider.notifier).startOptimizeLevel(levelToStart);
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const GameScreen(),
+                          ),
+                        );
+                      }
                     },
                     tag: l10n.text('challenge_tag'),
                     customIcon: Container(
@@ -337,42 +360,6 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
 
                   const Spacer(flex: 2),
-
-                  // Link de Política de Privacidad
-                  TextButton(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: isDark ? BorderSide.none : const BorderSide(color: Colors.black, width: 3),
-                          ),
-                          title: Text(l10n.text('privacy_policy_title')),
-                          content: SingleChildScrollView(
-                            child: Text(l10n.text('privacy_policy_content')),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text(l10n.text('understood_button')),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: Text(
-                      l10n.text('privacy_policy_title'),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: (isDark ? Colors.white : Colors.black)
-                            .withOpacity(0.4),
-                        decoration: TextDecoration.underline,
-                        decorationColor: (isDark ? Colors.white : Colors.black)
-                            .withOpacity(0.2),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 8),
                 ],
               ),

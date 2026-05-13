@@ -10,6 +10,7 @@ class StatsRepository {
   static const String _bestTimeKey = 'stats_best_time';
   static const String _bestTimeEqKey = 'stats_best_time_eq';
   static const String _hourDataKey = 'stats_hour_data';
+  static const String _lastOptimizeLevelKey = 'stats_last_optimize_level';
 
   Future<void> incrementGamesPlayed() async {
     final prefs = await SharedPreferences.getInstance();
@@ -92,5 +93,19 @@ class StatsRepository {
     await prefs.remove(_bestTimeKey);
     await prefs.remove(_bestTimeEqKey);
     await prefs.remove(_hourDataKey);
+    await prefs.remove(_lastOptimizeLevelKey);
+  }
+
+  Future<void> saveOptimizeProgress(int levelId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(_lastOptimizeLevelKey) ?? 0;
+    if (levelId > current) {
+      await prefs.setInt(_lastOptimizeLevelKey, levelId);
+    }
+  }
+
+  Future<int> getLastCompletedOptimizeLevel() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_lastOptimizeLevelKey) ?? 0;
   }
 }
