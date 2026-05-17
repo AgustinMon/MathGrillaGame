@@ -12,10 +12,12 @@ import 'presentation/providers/settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
-  await MobileAds.instance.updateRequestConfiguration(
-    RequestConfiguration(testDeviceIds: ['5dd73622-0e4d-457b-a1d1-99835fff45a5']),
-  );
+  if (!kIsWeb) {
+    await MobileAds.instance.initialize();
+    await MobileAds.instance.updateRequestConfiguration(
+      RequestConfiguration(testDeviceIds: ['5dd73622-0e4d-457b-a1d1-99835fff45a5']),
+    );
+  }
 
   // Bloquear orientación en vertical
   await SystemChrome.setPreferredOrientations([
